@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mount Gear Admin Dashboard</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 200px;
+            background-color: #343a40;
+            padding-top: 20px;
+        }
+        .sidebar a {
+            padding: 10px 15px;
+            text-decoration: none;
+            font-size: 18px;
+            color: #ddd;
+            display: block;
+        }
+        .sidebar a:hover {
+            background-color: #575d63;
+        }
+        .content {
+            margin-left: 200px;
+            padding: 20px;
+        }
+        .navbar .navbar-nav .nav-link {
+            color: white;
+        }
+        .card {
+            margin-top: 20px;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+        }
+        .action-icons i {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .action-icons .fa-edit {
+            color: blue;
+        }
+        .action-icons .fa-trash-alt {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-2 d-none d-md-block bg-dark sidebar">
+                <div class="sidebar-sticky">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-tachometer-alt mr-2"></i> Dashboard</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-box mr-2"></i> Product</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-th mr-2"></i> Category</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-users mr-2"></i> Customers</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-shopping-cart mr-2"></i> Orders</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-tags mr-2"></i> Coupons</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-images mr-2"></i> Banner</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-chart-line mr-2"></i> Reports</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-sign-out-alt mr-2"></i> Logout</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Content -->
+            <main role="main" class="col-md-10 ml-sm-auto px-4">
+                <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+                    <a class="navbar-brand" href="#">Mount Gear</a>
+                    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="navbarNav">
+                        <ul class="navbar-nav ml-auto">
+                            <li class="nav-item dropdown d-md-none">
+                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    Menu
+                                </a>
+                                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                    <a class="dropdown-item" href="#"><i class="fas fa-tachometer-alt mr-2"></i> Dashboard</a>
+                                    <a class="dropdown-item" href="#"><i class="fas fa-box mr-2"></i> Product</a>
+                                    <a class="dropdown-item" href="#"><i class="fas fa-th mr-2"></i> Category</a>
+                                    <a class="dropdown-item" href="#"><i class="fas fa-users mr-2"></i> Customers</a>
+                                    <a class="dropdown-item" href="#"><i class="fas fa-shopping-cart mr-2"></i> Orders</a>
+                                    <a class="dropdown-item" href="#"><i class="fas fa-tags mr-2"></i> Coupons</a>
+                                    <a class="dropdown-item" href="#"><i class="fas fa-images mr-2"></i> Banner</a>
+                                    <a class="dropdown-item" href="#"><i class="fas fa-chart-line mr-2"></i> Reports</a>
+                                    <a class="dropdown-item" href="#"><i class="fas fa-sign-out-alt mr-2"></i> Logout</a>
+                                </div>
+                            </li>
+                        </ul>
+                        <form class="form-inline ml-auto">
+                            <input class="form-control mr-sm-2" type="search" placeholder="Search Order" aria-label="Search">
+                        </form>
+                        <ul class="navbar-nav ml-auto">
+                            <li class="nav-item">
+                                <a class="nav-link" href="#"><i class="fas fa-user-circle"></i></a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+
+                <!-- Coupons Table -->
+                <div class="container-fluid mt-4">
+                    <h2>Coupons</h2>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Coupon Code</th>
+                                    <th>Value</th>
+                                    <th>Edit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>SAVE20</td>
+                                    <td>20%</td>
+                                    <td class="action-icons">
+                                        <i class="fas fa-edit"></i>
+                                        <i class="fas fa-trash-alt"></i>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>FREESHIP</td>
+                                    <td>Free Shipping</td>
+                                    <td class="action-icons">
+                                        <i class="fas fa-edit"></i>
+                                        <i class="fas fa-trash-alt"></i>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>WELCOME10</td>
+                                    <td>10% Off</td>
+                                    <td class="action-icons">
+                                        <i class="fas fa-edit"></i>
+                                        <i class="fas fa-trash-alt"></i>
+                                    </td>
+                                </tr>
+                                <!-- Add more rows as needed -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn btn-success mt-3">Add New Coupon</button>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

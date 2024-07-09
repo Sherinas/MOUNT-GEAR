@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mount Gear Admin Dashboard</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .sidebar {
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200px;
+            background-color: #343a40;
+            padding-top: 20px;
+        }
+        .sidebar a {
+            padding: 10px 15px;
+            text-decoration: none;
+            font-size: 18px;
+            color: #ddd;
+            display: block;
+        }
+        .sidebar a:hover {
+            background-color: #575d63;
+        }
+        .content {
+            margin-left: 200px; /* Adjusted margin for responsiveness */
+            padding: 20px;
+        }
+        .navbar .navbar-nav .nav-link {
+            color: white;
+        }
+        .card {
+            margin-top: 20px;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+        }
+        @media (max-width: 991.98px) {
+            .content {
+                margin-left: 0;
+            }
+            .sidebar {
+                width: 100%;
+                position: relative;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar d-none d-md-block">
+        <a href="/admin/dashboard"><i class="fas fa-tachometer-alt mr-2"></i> Dashboard</a>
+        <a href="/admin/products"><i class="fas fa-box mr-2"></i> Product</a>
+        <a href="/admin/categories"><i class="fas fa-th mr-2"></i> Category</a>
+        <a href="/admin/user"><i class="fas fa-users mr-2"></i> Customers</a>
+        <a href="./orders.html"><i class="fas fa-shopping-cart mr-2"></i> Orders</a>
+        <a href="./coupons.html"><i class="fas fa-tags mr-2"></i> Coupons</a>
+        <a href=""><i class="fas fa-images mr-2"></i> Banner</a>
+        <a href="./reports.html"><i class="fas fa-chart-line mr-2"></i> Reports</a>
+        <a href="admin/login"><i class="fas fa-sign-out-alt mr-2"></i> Logout</a>
+    </div>
+
+    <div class="content">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <a class="navbar-brand" href="#">Mount Gear</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown d-md-none">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            Menu
+                        </a>
+                        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            <a class="dropdown-item" href="#"><i class="fas fa-tachometer-alt mr-2"></i> Dashboard</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-box mr-2"></i> Product</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-th mr-2"></i> Category</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-users mr-2"></i> Customers</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-shopping-cart mr-2"></i> Orders</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-tags mr-2"></i> Coupons</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-images mr-2"></i> Banner</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-chart-line mr-2"></i> Reports</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-sign-out-alt mr-2"></i> Logout</a>
+                        </div>
+                    </li>
+                </ul>
+                <form class="form-inline ml-auto" action="/admin/search_Category" method="get"  >
+                    <input class="form-control mr-sm-2" type="search" placeholder="Search Category" name="query" aria-label="Search">
+                </form>
+                <ul class="navbar-nav ml-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="fas fa-user-circle"></i></a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <h2><i class="fas fa-th mr-2"></i> Categories</h2>
+            </div>
+            <table class="table table-striped mt-3">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Edit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .category}}
+                    <tr>
+                        <td>{{.ID}}</td>
+                        <td>{{.Name}}</td>
+                        <td>{{.Description}}</td>
+                        <td>{{if .IsActive}}Listed{{else}}unlisted{{end}}</td>
+                        <td>
+                            <a href="/admin/categories/edit/{{.ID}}" class="btn btn-primary btn-sm"><i class="fas fa-edit"></i> Edit</a>
+                            <form action="/admin/categories/{{.ID}}/toggle" method="POST" style="display:inline-block;">
+                                {{if .IsActive}}
+                                <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-eye-slash"></i> Unlist</button>
+                                {{else}}
+                                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-eye"></i> List</button>
+                                {{end}}
+                            </form>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            <a href="/admin/category_add"><button class="btn btn-success mt-3"><i class="fas fa-plus"></i> Add New Category</button></a>
+        </div>
+    </div>
+   
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+   
+        
+</body>
+</html>

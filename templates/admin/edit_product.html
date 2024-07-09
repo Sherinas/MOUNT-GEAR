@@ -1,0 +1,457 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mount Gear Admin Dashboard</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <style>
+.image-preview-container {
+    position: relative;
+    display: inline-block;
+    margin: 5px;
+}
+
+.image-preview {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+}
+
+.delete-image-btn {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background-color: red;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 16px;
+    line-height: 20px;
+    text-align: center;
+    cursor: pointer;
+}
+        
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .sidebar {
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200px;
+            background-color: #343a40;
+            padding-top: 20px;
+        }
+        .sidebar a {
+            padding: 10px 15px;
+            text-decoration: none;
+            font-size: 18px;
+            color: #ddd;
+            display: block;
+        }
+        .sidebar a:hover {
+            background-color: #575d63;
+        }
+        .content {
+            margin-left: 210px;
+            padding: 20px;
+        }
+        .navbar .navbar-nav .nav-link {
+            color: white;
+        }
+        .card {
+            margin-top: 20px;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+        }
+        .description-box {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            resize: none;
+        }
+        .quantity-box {
+            width: 100%;
+            height: 40px;
+            padding: 10px;
+        }
+        .upload-box {
+            width: 100%;
+            height: 242px;
+            border: 1px dashed #ccc;
+            margin-top: 31px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .upload-box i {
+            font-size: 36px;
+            color: #ccc;
+        }
+        .upload-box:hover {
+            background-color: #f8f9fa;
+        }
+        .image-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .image-preview {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border: 1px solid #ccc;
+        }
+        @media (max-width: 767.98px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .content {
+                margin-left: 0;
+            }
+        }
+        @media (min-width: 768px) {
+            .content {
+                margin-left: 210px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar d-none d-md-block">
+        <a href="/admin/dashboard"><i class="fas fa-tachometer-alt mr-2"></i> Dashboard</a>
+        <a href="/admin/products"><i class="fas fa-box mr-2"></i> Product</a>
+        <a href="/admin/categories"><i class="fas fa-th mr-2"></i> Category</a>
+        <a href="/admin/user"><i class="fas fa-users mr-2"></i> Customers</a>
+        <a href="./orders.html"><i class="fas fa-shopping-cart mr-2"></i> Orders</a>
+        <a href="./coupons.html"><i class="fas fa-tags mr-2"></i> Coupons</a>
+        <a href=""><i class="fas fa-images mr-2"></i> Banner</a>
+        <a href="./reports.html"><i class="fas fa-chart-line mr-2"></i> Reports</a>
+        <a href="/admin/login"><i class="fas fa-sign-out-alt mr-2"></i> Logout</a>
+    </div>
+
+    <div class="content">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <a class="navbar-brand" href="#">Mount Gear</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown d-md-none">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            Menu
+                        </a>
+                        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            <a class="dropdown-item" href="#"><i class="fas fa-tachometer-alt mr-2"></i> Dashboard</a>
+                            <a class="dropdown-item" href="/admin/products"><i class="fas fa-box mr-2"></i> Product</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-th mr-2"></i> Category</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-users mr-2"></i> Customers</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-shopping-cart mr-2"></i> Orders</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-tags mr-2"></i> Coupons</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-images mr-2"></i> Banner</a>
+                            <a class="dropdown-item" href="#"><i class="fas fa-chart-line mr-2"></i> Reports</a>
+                            <a class="dropdown-item" href="/admin/login"><i class="fas fa-sign-out-alt mr-2"></i> Logout</a>
+                        </div>
+                    </li>
+                </ul>
+                <form class="form-inline ml-auto">
+                    <input class="form-control mr-sm-2" type="search" placeholder="Search Product" aria-label="Search">
+                </form>
+                <ul class="navbar-nav ml-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="fas fa-user-circle"></i></a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <h2>Products</h2>
+            </div>
+            <form id="addProductForm" action="/admin/products/{{.product.ID}} "method="POST" enctype="multipart/form-data">
+              
+                <div class="row mt-3">
+                    <div class="col-md-8">
+                        <div class="form-group">
+                            <label for="productName">Product Name</label>
+                            <input type="text" class="form-control" id="productName"input type="text" name="Name" value="{{.product.Name}}" required>
+                        </div>
+                        <div style="display: flex;gap: 190px;">
+                            <div class="form-group">
+                                <label for="productPrice">Price</label>
+                                <input type="text" class="form-control" id="productPrice" input type="number" name="Price" value="{{.product.Price}}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="productQuantity">Stock</label>
+                                <input type="number" class="form-control quantity-box" id="productQuantity" type="number" name="Stock" value="{{.product.Stock}}" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="productCategory">Category</label>
+                            <select class="form-control" id="productCategory" name="category_id" required>
+                               
+                                
+                                <option>Select category</option>
+                               
+                                 {{range .categories}}
+                                <option value="{{.ID}}">{{.Name}}</option>
+                                  {{end}}
+                            </select>
+
+                            
+                <!-- Display existing images -->
+                <div class="form-group">
+                    <label>Existing Images</label>
+                    <div class="row">
+                        {{range .product.Images}}
+                        <div class="col-md-3">
+                            <img src="/public/uploads{{.ImageURL}}" alt="Product Image" style="width: 100px; height: 100px;">
+                            <input type="checkbox" name="delete_images" value="{{.ID}}"> Delete
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+
+
+                        </div>
+                        <div class="form-group">
+                            <label for="productDescription">Description</label>
+                            <textarea class="form-control description-box" id="productDescription" rows="3" placeholder="Enter product description" name="description"   value=required>"{{.product.Description}}"</textarea>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box" onclick="document.getElementById('uploadFile').click();">
+                            <input type="file" id="uploadFile" style="display:none" name="image" accept="image/*" multiple onchange="handleImageUpload(event)">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div class="image-preview-container" id="imagePreviewContainer"></div>
+                        <input type="hidden" accept="image/*" id="#"  name="#" >
+                    </div>
+
+                    
+                </div>
+                <button type="submit" class="btn btn-primary">Add Product</button>
+            </form>
+        </div>
+
+        <!-- Modal for cropping images -->
+        <div class="modal fade" id="cropModal" tabindex="-1" role="dialog" aria-labelledby="cropModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="cropModalLabel">Crop Image</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="img-container">
+                            <img id="cropImage" src="" alt="Image for cropping">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="cropButton">Crop</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script> -->
+
+ <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+</script>
+
+<script>
+    var imageFiles = {};
+var croppedImages = {};
+
+function handleImageUpload(event) {
+    var files = event.target.files;
+    var imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    
+    Array.from(files).forEach((file, index) => {
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var imgContainer = document.createElement('div');
+            imgContainer.className = 'image-preview-container';
+            imgContainer.dataset.index = index;
+
+            var img = document.createElement('img');
+            img.src = e.target.result;
+            img.className = 'image-preview';
+            img.onclick = function () {
+                imageElement = img;
+                document.getElementById('cropImage').src = e.target.result;
+                $('#cropModal').modal('show');
+            };
+
+            var deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '×';
+            deleteBtn.className = 'delete-image-btn';
+            deleteBtn.onclick = function(e) {
+                e.stopPropagation();
+                deleteImage(index);
+            };
+
+            imgContainer.appendChild(img);
+            imgContainer.appendChild(deleteBtn);
+            imagePreviewContainer.appendChild(imgContainer);
+            imageFiles[index] = file;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+$('#addProductForm').on('submit', function (e) {
+    e.preventDefault();
+    var formData = new FormData(this);
+
+    // Add new images to formData, preferring cropped versions when available
+    for (var index in imageFiles) {
+        if (croppedImages[index]) {
+            formData.append('new_images', croppedImages[index], 'croppedImage' + index + '.png');
+        } else {
+            formData.append('new_images', imageFiles[index]);
+        }
+    }
+
+    $.ajax({
+        url: $(this).attr('action'),
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function (response) {
+            alert('Product updated successfully');
+            window.location.href = '/admin/products';
+        },
+        error: function (error) {
+            console.error('Error updating product:', error);
+            alert('Error updating product');
+        }
+    });
+   
+});
+
+
+
+</script>
+
+
+<script>
+    function deleteExistingImage(imageId) {
+    if (confirm('Are you sure you want to delete this image?')) {
+        $.ajax({
+            url: '/admin/products/delete-image/' + imageId,
+            type: 'DELETE',
+            success: function(response) {
+                $(`[data-image-id="${imageId}"]`).remove();
+            },
+            error: function(error) {
+                console.error('Error deleting image:', error);
+                alert('Error deleting image');
+            }
+        });
+    }
+}
+
+function deleteNewImage(index) {
+    delete imageFiles[index];
+    delete croppedImages[index];
+    $(`[data-index="${index}"]`).remove();
+}
+
+function handleImageUpload(event) {
+    var files = event.target.files;
+    var imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    
+    Array.from(files).forEach((file, index) => {
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var imgContainer = document.createElement('div');
+            imgContainer.className = 'image-preview-container';
+            imgContainer.dataset.index = index;
+
+            var img = document.createElement('img');
+            img.src = e.target.result;
+            img.className = 'image-preview';
+            img.onclick = function () {
+                imageElement = img;
+                document.getElementById('cropImage').src = e.target.result;
+                $('#cropModal').modal('show');
+            };
+
+            var deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '×';
+            deleteBtn.className = 'delete-image-btn';
+            deleteBtn.onclick = function(e) {
+                e.stopPropagation();
+                deleteNewImage(index);
+            };
+
+            imgContainer.appendChild(img);
+            imgContainer.appendChild(deleteBtn);
+            imagePreviewContainer.appendChild(imgContainer);
+            imageFiles[index] = file;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+</script>
+<script>
+    $('#addProductForm').on('submit', function (e) {
+    e.preventDefault();
+    var formData = new FormData(this);
+
+    // Add new images to formData, preferring cropped versions when available
+    for (var index in imageFiles) {
+        if (croppedImages[index]) {
+            formData.append('new_images', croppedImages[index], 'croppedImage' + index + '.png');
+        } else {
+            formData.append('new_images', imageFiles[index]);
+        }
+    }
+
+    $.ajax({
+        url: $(this).attr('action'),
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function (response) {
+            alert('Product updated successfully');
+            window.location.href = '/admin/products';
+        },
+        error: function (error) {
+            console.error('Error updating product:', error);
+            alert('Error updating product');
+        }
+    });
+});
+</script>
+
+</body>
+</html>
