@@ -41,10 +41,6 @@ func AdminRoutes(router *gin.Engine) {
 		admin.GET("/search_Category", controllers.CategorySerch)
 		admin.GET("/logout", controllers.AdminLogout)
 
-		// 	admin.POST("/users", controllers.AdminCreateUser)
-		// 	admin.PUT("/users/:id", controllers.AdminUpdateUser)
-		// 	admin.DELETE("/users/:id", controllers.AdminDeleteUser)
-		// }
 	}
 
 }

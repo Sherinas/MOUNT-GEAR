@@ -13,7 +13,11 @@ func UserFetch(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch users"})
 		return
 	}
-	ctx.HTML(http.StatusOK, "customer.html", gin.H{"user": users})
+	//ctx.HTML(http.StatusOK, "customer.html", gin.H{"user": users})
+	ctx.JSON(http.StatusOK, gin.H{
+		"status": "Success",
+		"users":  users,
+	})
 }
 
 func BlockUser(c *gin.Context) {
@@ -30,8 +34,8 @@ func BlockUser(c *gin.Context) {
 		return
 	}
 
-	//c.JSON(http.StatusOK, gin.H{"message": "User blocked successfully"})
-	c.Redirect(http.StatusFound, "/admin/user")
+	c.JSON(http.StatusOK, gin.H{"message": "User blocked successfully"})
+	// c.Redirect(http.StatusFound, "/admin/user")
 }
 
 func UnBlockUser(c *gin.Context) {
@@ -47,6 +51,6 @@ func UnBlockUser(c *gin.Context) {
 		return
 	}
 
-	//c.JSON(http.StatusOK, gin.H{"message": "User unblocked successfully"})
-	c.Redirect(http.StatusFound, "/admin/user")
+	c.JSON(http.StatusOK, gin.H{"message": "User unblocked successfully"})
+	// c.Redirect(http.StatusFound, "/admin/user")
 }

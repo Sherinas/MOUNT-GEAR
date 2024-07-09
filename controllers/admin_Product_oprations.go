@@ -20,7 +20,10 @@ func GetProducts(ctx *gin.Context) {
 		return
 	}
 
-	ctx.HTML(http.StatusOK, "product.html", gin.H{"products": products})
+	//ctx.HTML(http.StatusOK, "product.html", gin.H{"products": products})
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":   "success",
+		"products": products})
 }
 
 func GetAddProductPage(c *gin.Context) {
@@ -30,8 +33,11 @@ func GetAddProductPage(c *gin.Context) {
 		return
 	}
 
-	// Pass categories to the template
-	c.HTML(http.StatusOK, "addproduct.html", gin.H{"categories": categories})
+	//c.HTML(http.StatusOK, "addproduct.html", gin.H{"categories": categories})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":     "success",
+		"categories": categories})
 }
 
 func AddProduct(ctx *gin.Context) {
@@ -42,7 +48,7 @@ func AddProduct(ctx *gin.Context) {
 	}
 	form, err := ctx.MultipartForm()
 	if err != nil {
-		log.Printf("Error parsing multipart form: %v", err)
+
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to parse form: %v", err)})
 		return
 	}
@@ -63,8 +69,6 @@ func AddProduct(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add product"})
 		return
 	}
-
-	log.Printf("Product added successfully with ID: %d", input.ID)
 
 	// Process uploaded files
 	files := form.File
@@ -92,20 +96,17 @@ func AddProduct(ctx *gin.Context) {
 			}
 			images = append(images, image)
 
-			log.Printf("Image saved: %s", dst)
 		}
 	}
 
 	// Save image records to database
 	if len(images) > 0 {
 		if err := models.DB.Create(&images).Error; err != nil {
-			log.Printf("Error saving image records: %v", err)
+
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image records"})
 			return
 		}
-		log.Println("Image records saved successfully")
-	} else {
-		log.Println("No images to save")
+
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "Product and images added successfully", "product_id": input.ID})
@@ -115,7 +116,7 @@ func ToggleProductStatus(ctx *gin.Context) { // check the code
 	id := ctx.Param("id")
 	var product models.Product
 	if err := models.DB.First(&product, id).Error; err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
 		return
 	}
 
@@ -124,7 +125,11 @@ func ToggleProductStatus(ctx *gin.Context) { // check the code
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update product status"})
 		return
 	}
-	ctx.Redirect(http.StatusFound, "/admin/products")
+	// ctx.Redirect(http.StatusFound, "/admin/products")
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Product status updated successfully",
+		"product": product})
 
 }
 
@@ -145,10 +150,17 @@ func GetEditProduct(ctx *gin.Context) {
 		return
 	}
 
-	ctx.HTML(http.StatusOK, "edit_product.html", gin.H{
+	// ctx.HTML(http.StatusOK, "edit_product.html", gin.H{
+	// 	"product":    product,
+	// 	"categories": categories,
+	// })
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":     "success",
 		"product":    product,
 		"categories": categories,
 	})
+
 }
 
 func UpdateProduct(ctx *gin.Context) {
@@ -213,5 +225,10 @@ func UpdateProduct(ctx *gin.Context) {
 		models.DB.Create(&newImage)
 	}
 
-	ctx.Redirect(http.StatusFound, "/admin/products")
+	// ctx.Redirect(http.StatusFound, "/admin/products")
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"Status":  "success",
+		"message": "Product updated successfully",
+	})
 }

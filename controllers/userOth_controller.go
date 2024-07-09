@@ -18,11 +18,15 @@ var TempStore2 = make(map[string]time.Time)
 
 func GetSignInPage(ctx *gin.Context) {
 
-	errorMessage := ctx.Query("error")
-	data := map[string]interface{}{
-		"Error": errorMessage,
-	}
-	ctx.HTML(http.StatusOK, "index.html", data)
+	// errorMessage := ctx.Query("error")
+	// data := map[string]interface{}{
+	// 	"Error": errorMessage,
+	// }
+	// ctx.HTML(http.StatusOK, "index.html", data)
+	ctx.JSON(http.StatusOK, gin.H{
+		"Status":  "success",
+		"message": "Welcome to Mountgear",
+	})
 
 }
 
@@ -35,19 +39,29 @@ func PostSignIn(c *gin.Context) {
 	var user models.User
 	if err := models.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
 
-		c.Redirect(http.StatusFound, "/login?error=User not found ")
-		log.Printf(" %v", err)
+		// c.Redirect(http.StatusFound, "/login?error=User not found ")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"Status":  "error",
+			"message": "User not found ",
+		})
 		return
 	}
 
 	if !user.IsActive {
-		c.Redirect(http.StatusFound, "/login?error=User is not active")
+		// c.Redirect(http.StatusFound, "/login?error=User is not active")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"Status":  "error",
+			"message": "User is not active",
+		})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		c.Redirect(http.StatusFound, "/login?error=invalid Password. please enter a valid password")
-
+		// c.Redirect(http.StatusFound, "/login?error=invalid Password. please enter a valid password")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"Status":  "error",
+			"message": "invalid Password. please enter a valid password",
+		})
 		return
 
 	}
@@ -60,11 +74,19 @@ func PostSignIn(c *gin.Context) {
 
 	c.SetCookie("token", tokenString, 300*72, "/", "localhost", false, true)
 
-	c.Redirect(http.StatusFound, "/home")
+	// c.Redirect(http.StatusFound, "/home")
+	c.JSON(http.StatusOK, gin.H{
+		"Status":  "success",
+		"message": "Login Successfull",
+	})
 }
 
 func GetSignUp(c *gin.Context) {
-	c.HTML(http.StatusOK, "signup.html", nil)
+	// c.HTML(http.StatusOK, "signup.html", nil)
+	c.JSON(http.StatusOK, gin.H{
+		"Status":  "success",
+		"message": "Render signup page",
+	})
 }
 
 func PostSignUp(c *gin.Context) {
@@ -75,24 +97,36 @@ func PostSignUp(c *gin.Context) {
 	Phone := c.PostForm("phone")
 	Email := c.PostForm("email")
 	Password := c.PostForm("password")
-	var errors = make(map[string]string)
+	// var errors = make(map[string]string)
 
 	if !utils.EmailValidation(Email) {
-		errors["error1"] = "Invalid email address"
+		// errors["error1"] = "Invalid email address"
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Status":  "error",
+			"message": "Invalid email address",
+		})
 
 	}
 	if !utils.ValidPhoneNumber(Phone) {
-		errors["error3"] = "Enter the a valid Number"
+		// errors["error3"] = "Enter the a valid Number"
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Status":  "error",
+			"message": "Enter the a valid Number",
+		})
 	}
 
 	if !utils.CheckPasswordComplexity(Password) {
-		errors["error2"] = "Password must be at least 4 characters long and include a mix of uppercase and lowercase letters"
+		// errors["error2"] = "Password must be at least 4 characters long and include a mix of uppercase and lowercase letters"
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Status":  "error",
+			"message": "Password must be at least 4 characters long and include a mix of",
+		})
 	}
 
-	if len(errors) > 0 {
-		c.HTML(http.StatusOK, "signup.html", errors)
-		return
-	}
+	// if len(errors) > 0 {
+	// 	c.HTML(http.StatusOK, "signup.html", errors)
+	// 	return
+	// }
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -102,8 +136,7 @@ func PostSignUp(c *gin.Context) {
 
 	HPassword := string(hashedPassword)
 	Otp := utils.GenerateOTP()
-	OtpExpiry := time.Now().Add(30 * time.Second)
-	log.Printf("gererated OTP: %v", Otp)
+	OtpExpiry := time.Now().Add(60 * time.Second)
 
 	TempStore["name"] = Name
 	TempStore["phone"] = Phone
@@ -114,8 +147,12 @@ func PostSignUp(c *gin.Context) {
 
 	if err := models.DB.Where("email = ?", Email).First(&user).Error; err == nil {
 
-		c.HTML(http.StatusOK, "signup.html", gin.H{
-			"error": "Email exist try another Email",
+		// c.HTML(http.StatusOK, "signup.html", gin.H{
+		// 	"error": "Email exist try another Email",
+		// })
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Status":  "error",
+			"message": "Email exist try another Email",
 		})
 		return
 
@@ -130,11 +167,14 @@ func PostSignUp(c *gin.Context) {
 
 	}
 
-	c.Redirect(http.StatusFound, "/verify-otp")
 }
 
 func GetOTP(c *gin.Context) {
-	c.HTML(http.StatusOK, "otp_form.html", nil)
+	// c.HTML(http.StatusOK, "otp_form.html", nil)
+	c.JSON(http.StatusOK, gin.H{
+		"Status":  "success",
+		"message": "Render Otp page",
+	})
 
 }
 
@@ -149,34 +189,28 @@ func PostOTP(c *gin.Context) {
 	input.Password = TempStore["password"]
 	Otp := TempStore["otp"]
 
-	log.Printf("Received OTP: %v", input.Email)
-	log.Printf("Expected OTP: %v", Otp)
-	log.Printf("Current Time: %v", time.Now())
-	log.Printf("OTP Expiry Time: %v", TempStore2["time"])
-
 	if EmailOTP != Otp || time.Now().After(TempStore2["time"]) {
-		log.Printf("Error: Invalid OTP or OTP has expired")
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid OTP or OTP has expired"})
 		return
 	}
 
-	// if err := models.DB.Where("Email = ?", input.Email).Find(&user).Error; err != nil {
-
-	// 	c.Redirect(http.StatusFound, "/reset-Password")
-	// }
 	if err := models.DB.Where("email = ?", input.Email).First(&user).Error; err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Status":  "Email already exists",
+			"Message": "reset your Password",
+		})
 
-		c.Redirect(http.StatusFound, "/reset-Password")
+		// c.Redirect(http.StatusFound, "/reset-Password")
 		return
 	} else if !gorm.IsRecordNotFoundError(err) {
 
-		log.Printf("Database Error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 
 	if err := models.DB.Create(&input).Error; err != nil {
-		log.Printf("Database Error: %v", err)
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -184,14 +218,16 @@ func PostOTP(c *gin.Context) {
 	input.IsActive = true
 
 	if err := models.DB.Save(&input).Error; err != nil {
-		log.Printf("Database Save Error: %v", err)
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("User created and activated: %v", input)
+	c.JSON(http.StatusOK, gin.H{
+		"Status": "User Created Successfully",
+	})
 
-	c.Redirect(http.StatusFound, "/login")
+	// c.Redirect(http.StatusFound, "/login")
 }
 
 func ResendOtp(c *gin.Context) {
@@ -209,7 +245,7 @@ func ResendOtp(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "OTP sent successfully"})
-	OtpExpiry := time.Now().Add(30 * time.Second)
+	OtpExpiry := time.Now().Add(60 * time.Second)
 	TempStore2["time"] = OtpExpiry
 
 	c.Redirect(http.StatusFound, "/verify-otp")
@@ -237,7 +273,7 @@ func PostForgotMailPage(c *gin.Context) {
 
 	}
 	Otp := utils.GenerateOTP()
-	OtpExpiry := time.Now().Add(30 * time.Minute)
+	OtpExpiry := time.Now().Add(60 * time.Minute)
 	TempStore2["time"] = OtpExpiry
 	TempStore["otp"] = Otp
 
@@ -307,5 +343,9 @@ func PostResetPassword(c *gin.Context) {
 }
 func Logout(c *gin.Context) {
 	c.SetCookie("token", "", -1, "/", "localhost", false, true)
-	c.Redirect(http.StatusFound, "/login")
+	// c.Redirect(http.StatusFound, "/login")
+	c.JSON(http.StatusOK, gin.H{
+
+		"message": "Logout Successfully",
+	})
 }

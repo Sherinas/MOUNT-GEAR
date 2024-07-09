@@ -16,14 +16,24 @@ func GetCategories(ctx *gin.Context) {
 		return
 	}
 
-	ctx.HTML(http.StatusOK, "category.html", gin.H{
-		"category": categories,
+	// ctx.HTML(http.StatusOK, "category.html", gin.H{
+	// 	"category": categories,
+	// })
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":     "success",
+		"categories": categories,
 	})
 }
 
 func GetAddCategoryPage(ctx *gin.Context) {
-	ctx.HTML(http.StatusOK, "addCategory.html", gin.H{
-		"title": "Add Category",
+	// ctx.HTML(http.StatusOK, "addCategory.html", gin.H{
+	// 	"title": "Add Category",
+	// })
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Add Category Page",
 	})
 }
 
@@ -38,7 +48,8 @@ func PostAddCategory(ctx *gin.Context) { // adding Category
 	var existingCategory models.Category
 
 	if err := models.DB.Where("LOWER(name) = ?", inputNameLower).First(&existingCategory).Error; err == nil {
-		ctx.Redirect(http.StatusFound, "/admin/categories")
+		// ctx.Redirect(http.StatusFound, "/admin/categories")
+		ctx.JSON(http.StatusConflict, gin.H{"error": "Category already exists"})
 		return
 	}
 
@@ -51,7 +62,8 @@ func PostAddCategory(ctx *gin.Context) { // adding Category
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add category"})
 		return
 	}
-	ctx.Redirect(http.StatusFound, "/admin/categories")
+	// ctx.Redirect(http.StatusFound, "/admin/categories")
+	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": "Category created successfully"})
 }
 
 func ToggleCategoryStatus(ctx *gin.Context) { // Toggle Button
@@ -67,7 +79,11 @@ func ToggleCategoryStatus(ctx *gin.Context) { // Toggle Button
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update category status"})
 		return
 	}
-	ctx.Redirect(http.StatusFound, "/admin/categories")
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":   "success",
+		"message":  "Category status updated successfully",
+		"category": category,
+	})
 }
 
 func GetEditCategory(ctx *gin.Context) { // Edit Category
@@ -79,7 +95,11 @@ func GetEditCategory(ctx *gin.Context) { // Edit Category
 		return
 	}
 
-	ctx.HTML(http.StatusOK, "edit_category.html", gin.H{
+	// ctx.HTML(http.StatusOK, "edit_category.html", gin.H{
+	// 	"Category": category,
+	// })
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":   "success",
 		"Category": category,
 	})
 }
@@ -115,7 +135,11 @@ func UpdateCategory(ctx *gin.Context) { //Update category
 		return
 	}
 
-	ctx.Redirect(http.StatusFound, "/admin/categories")
+	// ctx.Redirect(http.StatusFound, "/admin/categories")
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":   "success",
+		"Category": category,
+	})
 }
 
 func CategorySerch(c *gin.Context) {
@@ -127,6 +151,7 @@ func CategorySerch(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not search users"})
 		return
 	}
+	// c.HTML(http.StatusOK, "category.html", gin.H{"category": categories})
 
-	c.HTML(http.StatusOK, "category.html", gin.H{"category": categories})
+	c.JSON(http.StatusOK, gin.H{"category": categories})
 }
