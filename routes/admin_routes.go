@@ -23,7 +23,7 @@ func AdminRoutes(router *gin.Engine) {
 		admin.POST("/product_add", controllers.AddProduct)
 		admin.GET("/search_product", controllers.ProductSerch)
 
-		admin.POST("/products/:id/toggle", controllers.ToggleProductStatus)
+		admin.POST("/products/toggle/:id", controllers.ToggleProductStatus)
 		admin.GET("/products/edit/:id", controllers.GetEditProduct)
 		admin.POST("/products/:id", controllers.UpdateProduct)
 		//user routes
@@ -35,10 +35,10 @@ func AdminRoutes(router *gin.Engine) {
 		admin.GET("/categories", controllers.GetCategories) //chenge name to fetch
 		admin.GET("/category_add", controllers.GetAddCategoryPage)
 		admin.POST("/category_add", controllers.PostAddCategory)
-		admin.POST("/categories/:id/toggle", controllers.ToggleCategoryStatus)
+		admin.POST("/categories/toggle/:id", controllers.ToggleCategoryStatus)
 		admin.GET("/categories/edit/:id", controllers.GetEditCategory)
-		admin.GET("/search_Category", controllers.CategorySerch)
 		admin.POST("/categories/:id", controllers.UpdateCategory)
+		admin.GET("/search_Category", controllers.CategorySerch)
 		admin.GET("/logout", controllers.AdminLogout)
 
 		// 	admin.POST("/users", controllers.AdminCreateUser)
