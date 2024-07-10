@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
@@ -65,7 +66,15 @@ func main() {
 		})
 	}
 
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"https://oauth.pstmn.io"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 	r.Run(":3030")
+
 }
 
 func ensureUploadsDir() {

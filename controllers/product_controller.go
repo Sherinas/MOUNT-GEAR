@@ -14,7 +14,7 @@ func GetShop(ctx *gin.Context) {
 	if err := models.DB.Preload("Images", "id IN (SELECT MIN(id) FROM images GROUP BY product_id)").Find(&product).Error; err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{" error": err.Error()})
 	}
-	ctx.HTML(http.StatusOK, "shop.html", gin.H{
+	ctx.JSON(http.StatusOK, gin.H{
 		"products": product,
 	})
 }
@@ -28,7 +28,7 @@ func GetSingleProduct(ctx *gin.Context) {
 	}
 
 	log.Printf("Successfully fetched product %s: %+v", id, product)
-	ctx.HTML(http.StatusOK, "singleProduct.html", gin.H{"Product": product})
+	ctx.JSON(http.StatusOK, gin.H{"Product": product})
 }
 func ProductSerch(c *gin.Context) {
 
@@ -40,5 +40,5 @@ func ProductSerch(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "product.html", gin.H{"products": products})
+	c.JSON(http.StatusOK, gin.H{"products": products})
 }

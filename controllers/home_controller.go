@@ -12,7 +12,11 @@ func GetHome(c *gin.Context) {
 
 	token, err := c.Cookie("token")
 	if err != nil {
-		c.Redirect(http.StatusFound, "/login")
+		// c.Redirect(http.StatusFound, "/login")
+		c.JSON(200, gin.H{
+			"status":  "error",
+			"message": "You are not logged in",
+		})
 
 		return
 	}
@@ -20,7 +24,11 @@ func GetHome(c *gin.Context) {
 	// Validate the token and extract claims
 	claims, err := utils.ValidateToken(token)
 	if err != nil {
-		c.Redirect(http.StatusFound, "/login")
+		// c.Redirect(http.StatusFound, "/login")
+		c.JSON(200, gin.H{
+			"status":  "error",
+			"message": "You are not logged in",
+		})
 
 		return
 	}
@@ -41,7 +49,7 @@ func GetHome(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 
-	c.HTML(http.StatusOK, "home.html", gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"product": products, "category": categories, "images": images,
 		"claims": claims,
 	})

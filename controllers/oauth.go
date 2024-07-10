@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"mountgear/models"
 	"mountgear/utils"
 	"net/http"
@@ -16,21 +17,25 @@ import (
 func HandleGoogleLogin(c *gin.Context) {
 	url := utils.GoogleOauthConfig.AuthCodeURL(utils.OAuthStateString, oauth2.AccessTypeOffline)
 	c.Redirect(http.StatusTemporaryRedirect, url)
+	c.JSON(http.StatusTemporaryRedirect, url)
 }
 
 func HandleGoogleCallback(c *gin.Context) {
 	state := c.Query("state")
 	if state != utils.OAuthStateString {
 		fmt.Println("state is not valid")
-		c.Redirect(http.StatusTemporaryRedirect, "/")
+		// c.Redirect(http.StatusTemporaryRedirect, "/")
+		c.JSON(http.StatusTemporaryRedirect, "state is not valid")
 		return
 	}
 
 	code := c.Query("code")
 	token, err := utils.GoogleOauthConfig.Exchange(context.Background(), code)
 	if err != nil {
-		fmt.Println("could not get token")
-		c.Redirect(http.StatusTemporaryRedirect, "/")
+		log.Printf("%v", token)
+		log.Printf("%v", err)
+		// c.Redirect(http.StatusTemporaryRedirect, "/")
+		c.JSON(http.StatusTemporaryRedirect, "could not get token")
 		return
 	}
 
@@ -38,7 +43,8 @@ func HandleGoogleCallback(c *gin.Context) {
 	userInfo, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
 		fmt.Println("could not get user info")
-		c.Redirect(http.StatusTemporaryRedirect, "/")
+		// c.Redirect(http.StatusTemporaryRedirect, "/")
+		c.JSON(http.StatusTemporaryRedirect, "could not get user info")
 		return
 	}
 	defer userInfo.Body.Close()
@@ -53,7 +59,8 @@ func HandleGoogleCallback(c *gin.Context) {
 
 	if err := json.NewDecoder(userInfo.Body).Decode(&data); err != nil {
 		fmt.Println("could not decode user info")
-		c.Redirect(http.StatusTemporaryRedirect, "/")
+		// c.Redirect(http.StatusTemporaryRedirect, "/")
+		c.JSON(http.StatusTemporaryRedirect, "could not decode user info")
 		return
 	}
 
@@ -70,17 +77,24 @@ func HandleGoogleCallback(c *gin.Context) {
 		models.DB.Create(&user)
 	} else if err != nil {
 		fmt.Println("could not find or create user")
-		c.Redirect(http.StatusTemporaryRedirect, "/")
+		// c.Redirect(http.StatusTemporaryRedirect, "/")
+		c.JSON(http.StatusTemporaryRedirect, "could not find or create user")
 		return
 	}
 
 	tokenString, err := utils.GenerateToken(user.ID)
 	if err != nil {
 		fmt.Println("could not generate JWT")
-		c.Redirect(http.StatusTemporaryRedirect, "/")
+		// c.Redirect(http.StatusTemporaryRedirect, "/")
+		c.JSON(http.StatusTemporaryRedirect, "could not generate JWT")
 		return
 	}
 
 	c.SetCookie("token", tokenString, 300*72, "/", "localhost", false, true)
-	c.Redirect(http.StatusFound, "/home")
+	// c.Redirect(http.StatusFound, "/home")
+	c.JSON(http.StatusOK, gin.H{
+		"Status":  "success",
+		"Message": "Login Successful",
+	})
+
 }
