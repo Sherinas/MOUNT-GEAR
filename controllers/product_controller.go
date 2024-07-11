@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetShop(ctx *gin.Context) {
+func GetShopPage(ctx *gin.Context) {
 	var product []models.Product
 
 	if err := models.FetchData(models.DB.Preload("Images", "id IN (SELECT MIN(id) FROM images GROUP BY product_id)"), &product); err != nil {
@@ -17,7 +17,7 @@ func GetShop(ctx *gin.Context) {
 		"products": product,
 	})
 }
-func GetSingleProduct(ctx *gin.Context) {
+func GetProductDetails(ctx *gin.Context) {
 	id := ctx.Param("id")
 	var product models.Product
 

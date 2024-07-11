@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetHome(c *gin.Context) {
+func GetHomePage(c *gin.Context) {
 
 	token, err := c.Cookie("token")
 	if err != nil {

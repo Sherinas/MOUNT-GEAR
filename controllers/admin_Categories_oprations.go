@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetCategories(ctx *gin.Context) {
+func ListCategories(ctx *gin.Context) {
 	var categories []models.Category
 
 	if err := models.FetchData(models.DB, &categories); err != nil {
@@ -23,7 +23,7 @@ func GetCategories(ctx *gin.Context) {
 	})
 }
 
-func GetAddCategoryPage(ctx *gin.Context) {
+func GetNewCategoryForm(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -31,7 +31,7 @@ func GetAddCategoryPage(ctx *gin.Context) {
 	})
 }
 
-func PostAddCategory(ctx *gin.Context) { // adding Category
+func CreateCategory(ctx *gin.Context) { // adding Category
 	var input models.Category
 
 	input.Name = ctx.PostForm("category_name")
@@ -91,7 +91,7 @@ func ToggleCategoryStatus(ctx *gin.Context) { // Toggle Button
 	})
 }
 
-func GetEditCategory(ctx *gin.Context) { // Edit Category
+func GetEditCategoryForm(ctx *gin.Context) { // Edit Category
 	id := ctx.Param("id")
 	var category models.Category
 
@@ -150,7 +150,7 @@ func UpdateCategory(ctx *gin.Context) { //Update category
 	})
 }
 
-func CategorySerch(c *gin.Context) {
+func SearchCategories(c *gin.Context) {
 
 	query := c.Query("query")
 

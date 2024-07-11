@@ -7,7 +7,7 @@ import (
 )
 
 func HomeRoutes(router *gin.Engine) {
-	router.GET("/home", controllers.GetHome)
-	router.GET("/home/shop", controllers.GetShop)
-	router.GET("/home/shop/single-product/:id", controllers.GetSingleProduct)
+	router.GET("/home", controllers.GetHomePage)
+	router.GET("/home/shop", controllers.GetShopPage)
+	router.GET("/home/shop/single-product/:id", controllers.GetProductDetails)
 }

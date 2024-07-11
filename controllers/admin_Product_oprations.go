@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetProducts(ctx *gin.Context) {
+func ListProducts(ctx *gin.Context) {
 	var products []models.Product
 
 	if err := models.FetchData(models.DB.Preload("Category"), &products); err != nil {
@@ -24,7 +24,7 @@ func GetProducts(ctx *gin.Context) {
 		"products": products})
 }
 
-func GetAddProductPage(c *gin.Context) {
+func GetNewProductForm(c *gin.Context) {
 	var categories []models.Category
 
 	if err := models.CheckStatus(models.DB, true, &categories); err != nil { // checking the status if the prodect is active or not
@@ -38,7 +38,7 @@ func GetAddProductPage(c *gin.Context) {
 	})
 }
 
-func AddProduct(ctx *gin.Context) {
+func CreateProduct(ctx *gin.Context) {
 
 	if err := ctx.Request.ParseMultipartForm(10 << 20); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to parse form: %v", err)})
@@ -133,7 +133,7 @@ func ToggleProductStatus(ctx *gin.Context) { // check the code
 
 }
 
-func GetEditProduct(ctx *gin.Context) {
+func GetEditProductForm(ctx *gin.Context) {
 	id := ctx.Param("id")
 	var product models.Product
 

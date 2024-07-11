@@ -15,7 +15,7 @@ import (
 var TempStore = make(map[string]string)
 var TempStore2 = make(map[string]time.Time)
 
-func GetSignInPage(ctx *gin.Context) {
+func GetLoginPage(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"Status":  "success",
@@ -24,7 +24,7 @@ func GetSignInPage(ctx *gin.Context) {
 
 }
 
-func PostSignIn(c *gin.Context) {
+func Login(c *gin.Context) {
 
 	var input models.User
 	input.Email = c.PostForm("email")
@@ -78,7 +78,7 @@ func PostSignIn(c *gin.Context) {
 	})
 }
 
-func GetSignUp(c *gin.Context) {
+func GetSignUpPage(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"Status":  "success",
@@ -86,7 +86,7 @@ func GetSignUp(c *gin.Context) {
 	})
 }
 
-func PostSignUp(c *gin.Context) {
+func SignUp(c *gin.Context) {
 
 	var user models.User
 
@@ -158,7 +158,7 @@ func PostSignUp(c *gin.Context) {
 
 }
 
-func GetOTP(c *gin.Context) {
+func GetOTPVerificationPage(c *gin.Context) {
 	// c.HTML(http.StatusOK, "otp_form.html", nil)
 	c.JSON(http.StatusOK, gin.H{
 		"Status":  "success",
@@ -167,7 +167,7 @@ func GetOTP(c *gin.Context) {
 
 }
 
-func PostOTP(c *gin.Context) {
+func VerifyOTP(c *gin.Context) {
 	EmailOTP := c.PostForm("otp")
 	var input models.User
 	var user models.User
@@ -224,7 +224,7 @@ func PostOTP(c *gin.Context) {
 	// c.Redirect(http.StatusFound, "/login")
 }
 
-func ResendOtp(c *gin.Context) {
+func ResendOTP(c *gin.Context) {
 
 	email := TempStore["email"]
 
@@ -246,7 +246,7 @@ func ResendOtp(c *gin.Context) {
 
 }
 
-func GetForgotMailPage(c *gin.Context) {
+func GetForgotPasswordPage(c *gin.Context) {
 	// c.HTML(http.StatusOK, "forgotPassword.html", nil)
 	c.JSON(http.StatusOK, gin.H{
 		"Status":  "Success",
@@ -255,7 +255,7 @@ func GetForgotMailPage(c *gin.Context) {
 
 }
 
-func PostForgotMailPage(c *gin.Context) {
+func InitiatePasswordReset(c *gin.Context) {
 
 	var input models.User
 
@@ -285,7 +285,7 @@ func PostForgotMailPage(c *gin.Context) {
 
 }
 
-func GetResetPassword(c *gin.Context) {
+func GetResetPasswordPage(c *gin.Context) {
 	// c.HTML(http.StatusOK, "newPassword.html", nil)
 	c.JSON(http.StatusOK, gin.H{
 		"Status":  "Success",
@@ -294,7 +294,7 @@ func GetResetPassword(c *gin.Context) {
 
 }
 
-func PostResetPassword(c *gin.Context) {
+func ResetPassword(c *gin.Context) {
 
 	var input models.User
 	var user models.User

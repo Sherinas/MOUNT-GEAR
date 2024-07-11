@@ -14,32 +14,32 @@ func AdminRoutes(router *gin.Engine) {
 
 	{
 		admin.GET("/login", controllers.GetAdminLoginPage)
-		admin.POST("/login", controllers.PostAdminLogin)
-		admin.GET("/dashboard", controllers.AdminDashboard)
+		admin.POST("/login", controllers.LoginAdmin)
+		admin.GET("/dashboard", controllers.GetAdminDashboard)
 
 		// product routes
-		admin.GET("/products", controllers.GetProducts)
-		admin.GET("/product_add", controllers.GetAddProductPage)
-		admin.POST("/product_add", controllers.AddProduct)
-		admin.GET("/search_product", controllers.ProductSerch)
+		admin.GET("/products", controllers.ListProducts)
+		admin.GET("/product_add", controllers.GetNewProductForm)
+		admin.POST("/product_add", controllers.CreateProduct)
+		//admin.GET("/search_product", controllers.SearchProducts)
 
 		admin.POST("/products/toggle/:id", controllers.ToggleProductStatus)
-		admin.GET("/products/edit/:id", controllers.GetEditProduct)
+		admin.GET("/products/edit/:id", controllers.GetEditProductForm)
 		admin.POST("/products/:id", controllers.UpdateProduct)
 		//user routes
-		admin.GET("/user", controllers.UserFetch) // should chenge to user_route file
+		admin.GET("/user", controllers.ListUsers) // should chenge to user_route file
 		admin.POST("/user/blockUser/:id", controllers.BlockUser)
 		admin.POST("/user/unBlockUser/:id", controllers.UnBlockUser)
 
 		//category routes
-		admin.GET("/categories", controllers.GetCategories) //chenge name to fetch
-		admin.GET("/category_add", controllers.GetAddCategoryPage)
-		admin.POST("/category_add", controllers.PostAddCategory)
+		admin.GET("/categories", controllers.ListCategories) //chenge name to fetch
+		admin.GET("/category_add", controllers.GetNewCategoryForm)
+		admin.POST("/category_add", controllers.CreateCategory)
 		admin.POST("/categories/toggle/:id", controllers.ToggleCategoryStatus)
-		admin.GET("/categories/edit/:id", controllers.GetEditCategory)
+		admin.GET("/categories/edit/:id", controllers.GetEditCategoryForm)
 		admin.POST("/categories/:id", controllers.UpdateCategory)
-		admin.GET("/search_Category", controllers.CategorySerch)
-		admin.GET("/logout", controllers.AdminLogout)
+		admin.GET("/search_Category", controllers.SearchCategories)
+		admin.GET("/logout", controllers.LogoutAdmin)
 
 	}
 

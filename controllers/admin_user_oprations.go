@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func UserFetch(ctx *gin.Context) {
+func ListUsers(ctx *gin.Context) {
 	var users []models.User
 
 	if err := models.FetchData(models.DB, &users); err != nil {

@@ -18,7 +18,7 @@ func GetAdminLoginPage(ctx *gin.Context) {
 	})
 }
 
-func PostAdminLogin(ctx *gin.Context) {
+func LoginAdmin(ctx *gin.Context) {
 
 	var input models.AdminUser
 
@@ -58,7 +58,7 @@ func PostAdminLogin(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": "Login successful"})
 }
 
-func AdminDashboard(ctx *gin.Context) {
+func GetAdminDashboard(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -67,7 +67,7 @@ func AdminDashboard(ctx *gin.Context) {
 
 }
 
-func AdminLogout(ctx *gin.Context) {
+func LogoutAdmin(ctx *gin.Context) {
 
 	ctx.SetCookie("admin_token", "", -1, "/", "localhost", false, true)
 	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": "Logout successful"})
