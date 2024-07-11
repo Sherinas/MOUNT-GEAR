@@ -15,12 +15,10 @@ import (
 func GetProducts(ctx *gin.Context) {
 	var products []models.Product
 
-	if err := models.DB.Preload("Category").Find(&products).Error; err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
-		return
+	if err := models.FetchData(models.DB.Preload("Category"), &products); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch categories"})
 	}
 
-	//ctx.HTML(http.StatusOK, "product.html", gin.H{"products": products})
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":   "success",
 		"products": products})
@@ -28,16 +26,16 @@ func GetProducts(ctx *gin.Context) {
 
 func GetAddProductPage(c *gin.Context) {
 	var categories []models.Category
-	if err := models.DB.Where("is_active = ?", true).Find(&categories).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
-		return
-	}
 
-	//c.HTML(http.StatusOK, "addproduct.html", gin.H{"categories": categories})
+	if err := models.CheckStatus(models.DB, true, &categories); err != nil { // checking the status if the prodect is active or not
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
+
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":     "success",
-		"categories": categories})
+		"categories": categories,
+	})
 }
 
 func AddProduct(ctx *gin.Context) {
@@ -54,22 +52,23 @@ func AddProduct(ctx *gin.Context) {
 	}
 
 	var input models.Product
+
 	input.Name = ctx.PostForm("product_name")
 	input.Price, _ = strconv.ParseFloat(ctx.PostForm("product_price"), 64)
+
 	stock, _ := strconv.Atoi(ctx.PostForm("product_stock"))
 	input.Stock = int32(stock)
+
 	category, _ := strconv.Atoi(ctx.PostForm("category_id"))
 	input.CategoryID = uint(category)
+
 	input.Description = ctx.PostForm("description")
 	input.IsActive = true
 
-	// Save the product to the database
-	if err := models.DB.Create(&input).Error; err != nil {
-		log.Printf("Error creating product: %v", err)
+	if err := models.CreateRecord(models.DB, &input, &input); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add product"})
-		return
+		//**********************************************check this code and functions ********************************
 	}
-
 	// Process uploaded files
 	files := form.File
 	var images []models.Image
@@ -101,7 +100,7 @@ func AddProduct(ctx *gin.Context) {
 
 	// Save image records to database
 	if len(images) > 0 {
-		if err := models.DB.Create(&images).Error; err != nil {
+		if err := models.DB.Create(&images).Error; err != nil { // should change to function*********
 
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image records"})
 			return
@@ -115,17 +114,18 @@ func AddProduct(ctx *gin.Context) {
 func ToggleProductStatus(ctx *gin.Context) { // check the code
 	id := ctx.Param("id")
 	var product models.Product
-	if err := models.DB.First(&product, id).Error; err != nil {
+
+	if err := models.GetRecordByID(models.DB, &product, id); err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
 		return
 	}
 
 	product.IsActive = !product.IsActive
-	if err := models.DB.Save(&product).Error; err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update product status"})
-		return
+
+	if err := models.UpdateRecord(models.DB, &product); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product status"})
 	}
-	// ctx.Redirect(http.StatusFound, "/admin/products")
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Product status updated successfully",
@@ -137,23 +137,15 @@ func GetEditProduct(ctx *gin.Context) {
 	id := ctx.Param("id")
 	var product models.Product
 
-	if err := models.DB.Preload("Images").First(&product, id).Error; err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
-
-		return
+	if err := models.GetRecordByID(models.DB.Preload("Images"), &product, id); err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
 	}
 
 	var categories []models.Category
 
-	if err := models.DB.Where("is_active = ?", true).Find(&categories).Error; err != nil {
+	if err := models.CheckStatus(models.DB, true, &categories); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve categories"})
-		return
 	}
-
-	// ctx.HTML(http.StatusOK, "edit_product.html", gin.H{
-	// 	"product":    product,
-	// 	"categories": categories,
-	// })
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":     "success",
@@ -164,13 +156,13 @@ func GetEditProduct(ctx *gin.Context) {
 }
 
 func UpdateProduct(ctx *gin.Context) {
-	log.Println("UpdateProduct function called")
+
 	id := ctx.Param("id")
 
 	var existingProduct models.Product
-	if err := models.DB.Preload("Images").First(&existingProduct, id).Error; err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
-		return
+
+	if err := models.GetRecordByID(models.DB.Preload("Images"), &existingProduct, id); err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
 	}
 
 	updates := make(map[string]interface{})
@@ -198,7 +190,8 @@ func UpdateProduct(ctx *gin.Context) {
 	}
 
 	// Update the product with the changes
-	if err := models.DB.Model(&existingProduct).Updates(updates).Error; err != nil {
+
+	if err := models.UpdateModel(models.DB, &existingProduct, updates); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})
 		return
 	}
@@ -209,23 +202,23 @@ func UpdateProduct(ctx *gin.Context) {
 		var image models.Image
 		if err := models.DB.Where("id = ? AND product_id = ?", imageID, existingProduct.ID).First(&image).Error; err == nil {
 			models.DB.Delete(&image)
-		}
+		} // ***********************************************should change to function*******************************************
 	}
 
 	// Handle new image uploads
 	form, _ := ctx.MultipartForm()
 	files := form.File["new_images"]
+
 	for _, file := range files {
 		filename := filepath.Base(file.Filename)
+
 		if err := ctx.SaveUploadedFile(file, "public/uploads/"+filename); err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image"})
 			return
 		}
 		newImage := models.Image{ProductID: existingProduct.ID, ImageURL: "/uploads/" + filename}
 		models.DB.Create(&newImage)
-	}
-
-	// ctx.Redirect(http.StatusFound, "/admin/products")
+	} // **************************************************should change to function*******************************************
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"Status":  "success",

@@ -6,19 +6,16 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func GetCategories(ctx *gin.Context) {
 	var categories []models.Category
 
-	if err := models.DB.Find(&categories).Error; err != nil {
+	if err := models.FetchData(models.DB, &categories); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch categories"})
 		return
 	}
-
-	// ctx.HTML(http.StatusOK, "category.html", gin.H{
-	// 	"category": categories,
-	// })
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":     "success",
@@ -27,9 +24,6 @@ func GetCategories(ctx *gin.Context) {
 }
 
 func GetAddCategoryPage(ctx *gin.Context) {
-	// ctx.HTML(http.StatusOK, "addCategory.html", gin.H{
-	// 	"title": "Add Category",
-	// })
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -47,8 +41,9 @@ func PostAddCategory(ctx *gin.Context) { // adding Category
 
 	var existingCategory models.Category
 
-	if err := models.DB.Where("LOWER(name) = ?", inputNameLower).First(&existingCategory).Error; err == nil {
-		// ctx.Redirect(http.StatusFound, "/admin/categories")
+	// check if category already exists
+
+	if models.CheckExists(models.DB, &existingCategory, "LOWER(name) = ?", inputNameLower) {
 		ctx.JSON(http.StatusConflict, gin.H{"error": "Category already exists"})
 		return
 	}
@@ -57,28 +52,38 @@ func PostAddCategory(ctx *gin.Context) { // adding Category
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	input.IsActive = true
-	if err := models.DB.Create(&input).Error; err != nil {
+
+	// create New Category.
+
+	if err := models.CreateRecord(models.DB, &input, &input); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add category"})
 		return
 	}
-	// ctx.Redirect(http.StatusFound, "/admin/categories")
+
 	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": "Category created successfully"})
 }
 
 func ToggleCategoryStatus(ctx *gin.Context) { // Toggle Button
 	id := ctx.Param("id")
 	var category models.Category
-	if err := models.DB.First(&category, id).Error; err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
-		return
+
+	if err := models.GetRecordByID(models.DB, &category, id); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+			return
+		}
+
 	}
 
 	category.IsActive = !category.IsActive
-	if err := models.DB.Save(&category).Error; err != nil {
+
+	if err := models.UpdateRecord(models.DB, &category); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update category status"})
 		return
 	}
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":   "success",
 		"message":  "Category status updated successfully",
@@ -90,14 +95,14 @@ func GetEditCategory(ctx *gin.Context) { // Edit Category
 	id := ctx.Param("id")
 	var category models.Category
 
-	if err := models.DB.First(&category, id).Error; err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
-		return
+	if err := models.GetRecordByID(models.DB, &category, id); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+			return
+		}
+
 	}
 
-	// ctx.HTML(http.StatusOK, "edit_category.html", gin.H{
-	// 	"Category": category,
-	// })
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":   "success",
 		"Category": category,
@@ -109,9 +114,13 @@ func UpdateCategory(ctx *gin.Context) { //Update category
 	var category models.Category
 
 	// Find existing category
-	if err := models.DB.First(&category, id).Error; err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
-		return
+
+	if err := models.GetRecordByID(models.DB, &category, id); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+			return
+		}
+
 	}
 
 	// Bind only the fields we want to update
@@ -130,12 +139,11 @@ func UpdateCategory(ctx *gin.Context) { //Update category
 	category.Description = updateData.Description
 
 	// Save updates
-	if err := models.DB.Save(&category).Error; err != nil {
+
+	if err := models.UpdateRecord(models.DB, &category); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update category"})
-		return
 	}
 
-	// ctx.Redirect(http.StatusFound, "/admin/categories")
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":   "success",
 		"Category": category,
@@ -147,11 +155,11 @@ func CategorySerch(c *gin.Context) {
 	query := c.Query("query")
 
 	var categories []models.Category
-	if err := models.DB.Where("LOWER(name) LIKE LOWER(?)", "%"+query+"%").Find(&categories).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not search users"})
+
+	if err := models.SearchRecord(models.DB, query, &categories); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not search categories"})
 		return
 	}
-	// c.HTML(http.StatusOK, "category.html", gin.H{"category": categories})
 
 	c.JSON(http.StatusOK, gin.H{"category": categories})
 }

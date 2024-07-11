@@ -11,12 +11,6 @@ import (
 )
 
 func GetAdminLoginPage(ctx *gin.Context) {
-	// errorMsg := ctx.Query("error")
-
-	// ctx.HTML(200, "admin_login.html", gin.H{
-	// 	"title": "Login Page",
-	// 	"error": errorMsg,
-	// })
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -31,9 +25,10 @@ func PostAdminLogin(ctx *gin.Context) {
 	input.Email = ctx.PostForm("email")
 	input.Password = ctx.PostForm("password")
 
-	adminEmail, adminPassword := scripts.GetAdminCredentials()
+	adminEmail, adminPassword := scripts.GetAdminCredentials() // the admin credentials sevaed in .env this fuction call the .env
+
 	if input.Email != adminEmail {
-		// ctx.Redirect(http.StatusFound, "/admin/login?error=Invalid credentials")
+
 		ctx.JSON(http.StatusUnauthorized, gin.H{
 			"error": "Invalid Email ",
 		})
@@ -44,7 +39,7 @@ func PostAdminLogin(ctx *gin.Context) {
 
 	err := bcrypt.CompareHashAndPassword([]byte(input_Pass), []byte(adminPassword))
 	if err != nil {
-		// ctx.Redirect(http.StatusFound, "/admin/login?error=Invalid credentials")
+
 		ctx.JSON(http.StatusUnauthorized, gin.H{
 			"error": "Invalid Password",
 		})
@@ -60,15 +55,10 @@ func PostAdminLogin(ctx *gin.Context) {
 	}
 	ctx.SetCookie("admin_token", tokenString, 3600, "/", "localhost", false, true)
 
-	// ctx.Redirect(http.StatusFound, "/admin/dashboard")
 	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": "Login successful"})
 }
 
 func AdminDashboard(ctx *gin.Context) {
-
-	// ctx.HTML(http.StatusOK, "adminDashboard.html", gin.H{
-	// 	"title": "Admin Dashboard",
-	// })
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -78,8 +68,7 @@ func AdminDashboard(ctx *gin.Context) {
 }
 
 func AdminLogout(ctx *gin.Context) {
-	ctx.SetCookie("admin_token", "", -1, "/", "localhost", false, true)
 
-	// ctx.Redirect(http.StatusFound, "/admin/login")
+	ctx.SetCookie("admin_token", "", -1, "/", "localhost", false, true)
 	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": "Logout successful"})
 }
