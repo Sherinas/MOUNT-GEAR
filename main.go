@@ -50,7 +50,6 @@ func main() {
 
 	r.Static("/public", "./public")
 
-	// r.LoadHTMLGlob("templates/**")
 	r.LoadHTMLGlob(filepath.Join("templates", "**", "*.html"))
 
 	routes.AuthRoutes(r)
@@ -77,6 +76,7 @@ func main() {
 
 }
 
+// should delete
 func ensureUploadsDir() {
 	uploadsDir := "uploads"
 	if _, err := os.Stat(uploadsDir); os.IsNotExist(err) {
