@@ -8,7 +8,6 @@ import (
 	"mountgear/utils"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -46,11 +45,11 @@ func main() {
 	r.Use(gin.Logger())
 	r.Use(middlewares.NoCacheMiddleware())
 
-	r.Static("/assets", "./assets")
+	//r.Static("/assets", "./assets")
 
 	r.Static("/public", "./public")
 
-	r.LoadHTMLGlob(filepath.Join("templates", "**", "*.html"))
+	//r.LoadHTMLGlob(filepath.Join("templates", "**", "*.html"))
 
 	routes.AuthRoutes(r)
 	routes.HomeRoutes(r)
