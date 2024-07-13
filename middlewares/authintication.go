@@ -19,7 +19,9 @@ func AuthMiddleware() gin.HandlerFunc {
 				return
 			}
 		}
+
 		c.Next()
+
 	}
 }
 func AdminAuthMiddleware() gin.HandlerFunc {
