@@ -15,7 +15,6 @@ type User struct {
 	SocialLoginId       string    `gorm:"size:100"`
 	Addresses           []Address `gorm:"foreignKey:UserID"`
 	Orders              []Order   `gorm:"foreignKey:UserID"`
-	Otp                 string    `gorm:"size:6;not null"`
 	OtpExpiry           time.Time `gorm:"not null"`
 }
 

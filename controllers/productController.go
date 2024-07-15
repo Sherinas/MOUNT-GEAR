@@ -40,7 +40,7 @@ func GetProductDetails(ctx *gin.Context) {
 		"Product": product})
 }
 
-func ProductSerch(c *gin.Context) {
+func ProductSerch(c *gin.Context) { // change name @@@@
 
 	query := c.Query("query")
 

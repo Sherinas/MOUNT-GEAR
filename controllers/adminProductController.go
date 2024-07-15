@@ -55,9 +55,17 @@ func CreateProduct(ctx *gin.Context) {
 
 	input.Name = ctx.PostForm("product_name")
 	input.Price, _ = strconv.ParseFloat(ctx.PostForm("product_price"), 64)
+	if input.Price < 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Price cannot be negative"})
+		return
+	}
 
 	stock, _ := strconv.Atoi(ctx.PostForm("product_stock"))
 	input.Stock = int32(stock)
+	if input.Stock < 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Stock cannot be negative"})
+		return
+	}
 
 	category, _ := strconv.Atoi(ctx.PostForm("category_id"))
 	input.CategoryID = uint(category)
@@ -187,11 +195,19 @@ func UpdateProduct(ctx *gin.Context) {
 	}
 	if price := ctx.PostForm("Price"); price != "" {
 		if priceFloat, err := strconv.ParseFloat(price, 64); err == nil {
+			if priceFloat < 0 {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "Price cannot be negative"})
+				return
+			}
 			updates["price"] = priceFloat
 		}
 	}
 	if stock := ctx.PostForm("Stock"); stock != "" {
 		if stockInt, err := strconv.Atoi(stock); err == nil {
+			if stockInt < 0 {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "Stock cannot be negative"})
+				return
+			}
 			updates["stock"] = stockInt
 		}
 	}

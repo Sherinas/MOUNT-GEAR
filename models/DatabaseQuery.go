@@ -31,6 +31,15 @@ func CreateRecord(db *gorm.DB, model interface{}, data interface{}) error {
 	return nil
 }
 
+// //////////////////////////////////////////////////////////////////////// delete this
+func CreateRecorddata(db *gorm.DB, data interface{}) error {
+	if err := db.Create(data).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// //////////////////////////////////////////////////////////////////////////
 func GetRecordByID(db *gorm.DB, model interface{}, id string) error {
 	// Convert id to integer
 	recordID, err := strconv.Atoi(id)

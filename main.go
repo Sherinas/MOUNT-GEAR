@@ -40,6 +40,7 @@ func main() {
 	}
 	models.SetDatabase(db)
 	models.AutoMigrate(db)
+	// RunMigrations()
 
 	r := gin.Default()
 	r.Use(gin.Logger())
@@ -85,3 +86,34 @@ func ensureUploadsDir() {
 		}
 	}
 }
+
+// func RunMigrations() error {
+// 	db := models.DatabaseSetup()
+
+// 	if db == nil {
+// 		return fmt.Errorf("failed to connect to database")
+// 	}
+
+// 	if err := models.AutoMigrate(db); err != nil {
+// 		return fmt.Errorf("failed to run migrations: %v", err)
+// 	}
+
+// 	if err := AddPriceConstraint(db); err != nil {
+// 		return fmt.Errorf("failed to add price constraint: %v", err)
+// 	}
+
+// 	if err := AddStockConstraint(db); err != nil {
+// 		return fmt.Errorf("failed to add stock constraint: %v", err)
+// 	}
+
+// 	log.Println("Migrations completed successfully")
+// 	return nil
+// }
+
+// func AddPriceConstraint(db *gorm.DB) error {
+// 	return db.Exec(`ALTER TABLE products ADD CONSTRAINT IF NOT EXISTS check_price_positive CHECK (price >= 0)`).Error
+// }
+
+// func AddStockConstraint(db *gorm.DB) error {
+// 	return db.Exec(`ALTER TABLE products ADD CONSTRAINT IF NOT EXISTS check_stock_non_negative CHECK (stock >= 0)`).Error
+// }
