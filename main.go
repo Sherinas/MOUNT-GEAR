@@ -63,7 +63,7 @@ func main() {
 			c.JSON(http.StatusOK, gin.H{"user_id": userID})
 		})
 	}
-
+	//delete this lines
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"https://oauth.pstmn.io"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},

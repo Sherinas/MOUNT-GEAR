@@ -126,7 +126,7 @@ func SignUp(c *gin.Context) {
 
 		HPassword := string(hashedPassword)
 		Otp := utils.GenerateOTP()
-		OtpExpiry := time.Now().Add(30 * time.Second)
+		OtpExpiry := time.Now().Add(60 * time.Second)
 		log.Printf("gererated OTP: %v", Otp)
 
 		TempStore["name"] = Name
@@ -136,7 +136,7 @@ func SignUp(c *gin.Context) {
 		TempStore2["time"] = OtpExpiry
 		TempStore["otp"] = Otp
 
-		if err := models.EmailExists(models.DB, Email, &user); err != nil {
+		if err := models.EmailExists(models.DB, Email, &user); err == nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"Status":  "error",
 				"message": "Email already exists",

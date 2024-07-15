@@ -1,50 +1,49 @@
 package middlewares
 
-import (
-	"mountgear/models"
-	"mountgear/utils"
-	"net/http"
+// func UserStatus() gin.HandlerFunc {
+// 	return func(c *gin.Context) {
 
-	"github.com/gin-gonic/gin"
-)
+// 		token, err := c.Cookie("token")
+// 		if err != nil || token == "" {
+// 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized",
+// 				"message": "please login first"})
 
-func UserStatus() gin.HandlerFunc {
-	return func(c *gin.Context) {
+// 			c.Abort()
+// 			return
+// 		}
+// 		claims, err := utils.ValidateToken(token)
+// 		if err != nil {
+// 			// If the token is invalid, clear the cookie and redirect to login
+// 			c.SetCookie("token", "", -1, "/", "localhost", false, true)
+// 			c.JSON(http.StatusUnauthorized, gin.H{
+// 				"error":   "unauthorized",
+// 				"message": "please login first"})
 
-		token, err := c.Cookie("token")
-		if err != nil || token == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-			c.Abort()
-			return
-		}
-		claims, err := utils.ValidateToken(token)
-		if err != nil {
-			// If the token is invalid, clear the cookie and redirect to login
-			c.SetCookie("token", "", -1, "/", "localhost", false, true)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-			c.Abort()
-			return
-		}
-		var user models.User
-		if err := models.DB.First(&user, claims.UserID).Error; err != nil {
-			// If user not found, clear the cookie
-			c.SetCookie("token", "", -1, "/", "localhost", false, true)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-			c.Abort()
-			return
-		}
+// 			c.Abort()
+// 			return
+// 		}
+// 		var user models.User
+// 		if err := models.DB.First(&user, claims.UserID).Error; err != nil {
+// 			// If user not found, clear the cookie
+// 			c.SetCookie("token", "", -1, "/", "localhost", false, true)
+// 			c.JSON(http.StatusUnauthorized, gin.H{
+// 				"error":   "unauthorized",
+// 				"message": "please login first"})
+// 			c.Abort()
+// 			return
+// 		}
 
-		// Check if the user is active
-		if !user.IsActive {
+// 		// Check if the user is active
+// 		if !user.IsActive {
 
-			c.SetCookie("token", "", -1, "/", "localhost", false, true)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized",
-				"message": "your access is temporarily blocked "})
+// 			c.SetCookie("token", "", -1, "/", "localhost", false, true)
+// 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized",
+// 				"message": "your access is temporarily blocked "})
 
-			c.Abort()
-			return
-		}
+// 			c.Abort()
+// 			return
+// 		}
 
-		c.Next()
-	}
-}
+// 		c.Next()
+// 	}
+// }

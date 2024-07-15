@@ -27,12 +27,12 @@ func AdminRoutes(router *gin.Engine) {
 		admin.GET("/products/edit/:id", controllers.GetEditProductForm)
 		admin.POST("/products/:id", controllers.UpdateProduct)
 		//user routes
-		admin.GET("/user", controllers.ListUsers) // should chenge to user_route file
+		admin.GET("/user", controllers.ListUsers)
 		admin.POST("/user/blockUser/:id", controllers.BlockUser)
 		admin.POST("/user/unBlockUser/:id", controllers.UnBlockUser)
 
 		//category routes
-		admin.GET("/categories", controllers.ListCategories) //chenge name to fetch
+		admin.GET("/categories", controllers.ListCategories)
 		admin.GET("/category_add", controllers.GetNewCategoryForm)
 		admin.POST("/category_add", controllers.CreateCategory)
 		admin.POST("/categories/toggle/:id", controllers.ToggleCategoryStatus)

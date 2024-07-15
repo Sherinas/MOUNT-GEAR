@@ -16,8 +16,9 @@ func FetchData(db *gorm.DB, model interface{}) error {
 func CheckExists(db *gorm.DB, model interface{}, condition string, args ...interface{}) bool {
 	return db.Where(condition, args...).First(model).Error == nil
 }
+
 func EmailExists(db *gorm.DB, email string, user *User) error {
-	if err := db.Where("email = ?", email).First(user).Error; err != nil {
+	if err := db.Where("email = ?", email).First(&user).Error; err != nil {
 		return err
 	}
 	return nil

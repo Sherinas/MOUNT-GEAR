@@ -16,7 +16,7 @@ import (
 
 func HandleGoogleLogin(c *gin.Context) {
 	url := utils.GoogleOauthConfig.AuthCodeURL(utils.OAuthStateString, oauth2.AccessTypeOffline)
-	c.Redirect(http.StatusTemporaryRedirect, url)
+	// c.Redirect(http.StatusTemporaryRedirect, url)
 	c.JSON(http.StatusTemporaryRedirect, url)
 }
 
