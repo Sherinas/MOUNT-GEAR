@@ -79,6 +79,10 @@ func ToggleCategoryStatus(ctx *gin.Context) { // Toggle Button
 
 	category.IsActive = !category.IsActive
 
+	if err := models.UpdateProductStatusByCategory(models.DB, category.ID, category.IsActive); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update products status"})
+		return
+	}
 	if err := models.UpdateRecord(models.DB, &category); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update category status"})
 		return

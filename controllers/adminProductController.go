@@ -114,9 +114,21 @@ func CreateProduct(ctx *gin.Context) {
 func ToggleProductStatus(ctx *gin.Context) { // check the code
 	id := ctx.Param("id")
 	var product models.Product
+	var category models.Category
 
 	if err := models.GetRecordByID(models.DB, &product, id); err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+		return
+	}
+
+	if err := models.DB.First(&category, product.CategoryID).Error; err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Category not found"})
+		return
+	} // add to query function''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+	// Check if the category is active
+	if !category.IsActive {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "Cannot change product status because the category is inactive"})
 		return
 	}
 

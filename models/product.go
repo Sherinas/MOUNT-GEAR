@@ -8,9 +8,9 @@ type Product struct {
 	Category      Category  `gorm:"foreignKey:CategoryID"`
 	Name          string    `gorm:"size:100"`
 	Description   string    `gorm:"type:text"`
-	Price         float64   `gorm:"decimal(10,2)"`
+	Price         float64   `gorm:"type:decimal(10,2)" validate:"gte=0"`
 	DiscountPrice float64   `gorm:"type:decimal(10,2)"`
-	Stock         int32     `gorm:"not null"`
+	Stock         int32     `gorm:"not null" validate:"gte=0"`
 	IsActive      bool      `gorm:"default:true"`
 	Images        []Image   `gorm:"foreignKey:ProductID"`
 	Reviews       []Review  `gorm:"foreignKey:ProductID"`

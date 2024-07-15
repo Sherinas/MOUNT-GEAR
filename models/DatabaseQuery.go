@@ -80,3 +80,6 @@ func FindUserByID(db *gorm.DB, id string, user *User) error {
 	}
 	return nil
 }
+func UpdateProductStatusByCategory(db *gorm.DB, categoryID uint, status bool) error {
+	return db.Model(&Product{}).Where("category_id = ?", categoryID).Update("is_active", status).Error
+}

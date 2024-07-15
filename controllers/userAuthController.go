@@ -19,7 +19,7 @@ func GetLoginPage(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"Status":  "success",
-		"message": "Welcome to Mountgear",
+		"message": "Welcome to Mountgear  please login  ",
 	})
 
 }
