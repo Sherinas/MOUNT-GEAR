@@ -2,10 +2,12 @@ package controllers
 
 import (
 	"mountgear/models"
+	"mountgear/utils"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -35,9 +37,189 @@ func GetUserProfile(c *gin.Context) {
 	})
 }
 
-func GetAddAddress(c *gin.Context) {
+func GetEditProfile(c *gin.Context) {
 
-	c.JSON(http.StatusOK, gin.H{"message": "Ready to add address"})
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "unauthorized",
+			"message": "need  to signup",
+		})
+		return
+	}
+	var user models.User
+
+	if err := models.DB.First(&user, userID).Error; err != nil { // change to function
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"Status": "Success",
+		"Name":   user.Name,
+		"Phone":  user.Phone,
+	})
+
+}
+
+func EditProfile(c *gin.Context) {
+
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "unauthorized",
+			"message": "need  to signup",
+		})
+		return
+	}
+	var user models.User
+
+	if err := models.DB.First(&user, userID).Error; err != nil { // change to function
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	user.Name = c.PostForm("name")
+	user.Phone = c.PostForm("phone")
+
+	if !utils.ValidPhoneNumber(user.Phone) {
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Status":  "error",
+			"message": "Enter the a valid Number",
+		})
+		return
+	}
+
+	if err := models.DB.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"}) /// function add
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"Status":  "Success",
+		"message": "profile successfully Updated",
+
+		"users": user.Name,
+		"phone": user.Phone,
+	})
+
+}
+
+func GetChangePassword(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "unauthorized",
+			"message": "need  to signup",
+		})
+		return
+	}
+	var user models.User
+
+	if err := models.DB.First(&user, userID).Error; err != nil { // change to function
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"Status": "Success",
+
+		"Name":  user.Name,
+		"Phone": user.Phone,
+		"Email": user.Email,
+	})
+
+}
+
+func ChangePassword(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "unauthorized",
+			"message": "need to signup",
+		})
+		return
+	}
+
+	var user models.User
+
+	if err := models.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	currentPassword := c.PostForm("password")
+	newPassword := c.PostForm("newPassword")
+	confirmPassword := c.PostForm("confirmPassword")
+
+	if newPassword != confirmPassword {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password and confirm password do not match"})
+		return
+	}
+
+	if !utils.CheckPasswordComplexity(newPassword) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Password must be at least 4 characters long and include a mix of uppercase, lowercase, numbers, and special characters",
+		})
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(currentPassword)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "Invalid current password. Please enter a valid password",
+		})
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash new password"})
+		return
+	}
+
+	result := models.DB.Model(&user).Update("password", string(hashedPassword))
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Password updated successfully",
+	})
+}
+func GetAddAddress(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "unauthorized",
+			"message": "need to signup",
+		})
+		return
+	}
+
+	var addresses []models.Address
+
+	if err := models.DB.Where("user_id = ?", userID).Find(&addresses).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve addresses"})
+		return
+	}
+
+	if len(addresses) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "No addresses found for this user. Ready to add address.",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":    "success",
+		"addresses": addresses,
+		"message":   "Addresses retrieved successfully",
+	})
 
 }
 
@@ -75,12 +257,12 @@ func AddAddress(c *gin.Context) {
 	input.Zipcode = c.PostForm("zipCode")
 	input.Country = c.PostForm("country")
 	input.UserID = userID.(uint)
-	isDefault := c.PostForm("IsDefault")
-	if isDefault == "true" {
-		input.IsDefault = true
-	} else {
-		input.IsDefault = false
-	}
+	// isDefault := c.PostForm("IsDefault")
+	// if isDefault == "true" {
+	// 	input.IsDefault = true
+	// } else {
+	// 	input.IsDefault = false
+	// }
 
 	if input.AddressLine1 == "" || input.City == "" || input.State == "" || input.Zipcode == "" || input.Country == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Required fields are missing"})
@@ -96,6 +278,94 @@ func AddAddress(c *gin.Context) {
 		"message": "Address added successfully",
 	})
 
+}
+
+func GetEditAddress(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "Unauthorized",
+			"message": "User not authenticated",
+		})
+		return
+	}
+
+	// Get the address ID from the request parameters
+	addressID := c.Param("id")
+
+	// Convert addressID to uint
+	id, err := strconv.ParseUint(addressID, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address ID"})
+		return
+	}
+
+	// Find the address
+	var address models.Address
+	if err := models.DB.Where("id = ? AND user_id = ?", id, userID).First(&address).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Address not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+
+		"Status": "Success",
+
+		"message": "Address found successfully",
+		"address": address,
+	})
+
+}
+
+func EditAddress(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "Unauthorized",
+			"message": "User not authenticated",
+		})
+		return
+	}
+
+	// Get the address ID from the request parameters
+	addressID := c.Param("id")
+
+	// Convert addressID to uint
+	id, err := strconv.ParseUint(addressID, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address ID"})
+		return
+	}
+
+	var address models.Address
+	if err := models.DB.Where("id = ? AND user_id = ?", id, userID).First(&address).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Address not found or doesn't belong to the user"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find address"})
+		}
+		return
+	}
+
+	// Update the address fields
+	address.AddressLine1 = c.PostForm("addressLine1")
+	address.AddressLine2 = c.PostForm("addressLine2")
+	address.City = c.PostForm("city")
+	address.State = c.PostForm("state")
+	address.Zipcode = c.PostForm("zipCode")
+	address.Country = c.PostForm("country")
+
+	// Save the updated address
+	if err := models.DB.Save(&address).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update address"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Address updated successfully",
+		"address": address,
+	})
 }
 
 func DeleteAddress(c *gin.Context) {

@@ -67,6 +67,14 @@ func CreateProduct(ctx *gin.Context) {
 		return
 	}
 
+	discountPercentage, err := strconv.ParseFloat(ctx.PostForm("discount_percentage"), 64)
+	if err == nil && discountPercentage >= 0 && discountPercentage <= 99 {
+		input.Discount = discountPercentage
+	} else {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid discount percentage. Must be between 0 and 99."})
+		return
+	}
+
 	category, _ := strconv.Atoi(ctx.PostForm("category_id"))
 	input.CategoryID = uint(category)
 
@@ -211,6 +219,18 @@ func UpdateProduct(ctx *gin.Context) {
 			updates["stock"] = stockInt
 		}
 	}
+
+	// Handle discount percentage update
+	if discountPercentage := ctx.PostForm("discount_percentage"); discountPercentage != "" {
+		if discountFloat, err := strconv.ParseFloat(discountPercentage, 64); err == nil {
+			if discountFloat < 0 || discountFloat > 99 {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "Discount percentage must be between 0 and 99"})
+				return
+			}
+			updates["discount_percentage"] = discountFloat
+		}
+	}
+
 	if categoryID := ctx.PostForm("category_id"); categoryID != "" {
 		if catID, err := strconv.ParseUint(categoryID, 10, 32); err == nil {
 			updates["category_id"] = uint(catID)

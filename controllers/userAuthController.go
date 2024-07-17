@@ -329,7 +329,7 @@ func ResetPassword(c *gin.Context) {
 	}
 
 	hashPass := string(hashedPassword)
-	log.Printf("%v", hashPass)
+	log.Printf("%v", hashPass) //delete this
 
 	result := models.DB.Model(&user).Where("email = ?", input.Email).Update("password", string(hashedPassword))
 	if result.Error != nil {

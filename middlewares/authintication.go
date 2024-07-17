@@ -42,13 +42,13 @@ func AuthMiddleware() gin.HandlerFunc {
 			if err == nil {
 				c.Set("userID", claims.UserID)
 			}
-		} else {
-			// If no token and trying to access protected route, redirect to login
-			if c.Request.URL.Path != "/login" && c.Request.URL.Path != "/signup" {
-				c.Redirect(http.StatusFound, "/login")
-				c.Abort()
-				return
-			}
+			// } else {
+			// 	// If no token and trying to access protected route, redirect to login
+			// 	if c.Request.URL.Path != "/login" && c.Request.URL.Path != "/signup" {
+			// 		c.Redirect(http.StatusFound, "/login")
+			// 		c.Abort()
+			// 		return
+			// 	}
 		}
 
 		c.Next()

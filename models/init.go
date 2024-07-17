@@ -58,6 +58,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&Banner{},
 		&SalesReport{},
 		&Stock{},
+		&Cart{}, // Add this line
+		&CartItem{},
 	)
 	return err
 }
