@@ -40,16 +40,19 @@ func GetCartPage(c *gin.Context) {
 		totalPrice += itemTotal //check the code if discount is 0 what can do
 
 		cartItemsResponse = append(cartItemsResponse, gin.H{
+			"cart_item_id":     item.ID,
 			"product_id":       item.ProductID,
 			"product_name":     item.Product.Name,
 			"quantity":         item.Quantity,
 			"price":            item.Product.Price,
 			"discounted_price": discountedPrice,
+			"discount":         item.Product.Discount,
 			"item_total":       itemTotal,
 		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
+
 		"cart_id":     cart.ID,
 		"cart_items":  cartItemsResponse,
 		"total_price": totalPrice,
@@ -87,7 +90,7 @@ func UpdateCartItemQuantity(c *gin.Context) {
 		return
 	}
 
-	if requestBody.Quantity == 0 {
+	if requestBody.Quantity == 0 { // this is not going to work
 		// Remove the item from the cart
 		if err := models.DB.Delete(&cartItem).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove item from cart"})
@@ -95,7 +98,12 @@ func UpdateCartItemQuantity(c *gin.Context) {
 		}
 	} else {
 		// Update the quantity
+
 		cartItem.Quantity = requestBody.Quantity
+		if cartItem.Quantity > 5 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Quantity cannot be more than 5"})
+			return
+		}
 		if err := models.DB.Save(&cartItem).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item quantity"})
 			return

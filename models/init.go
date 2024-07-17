@@ -57,7 +57,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&AdminUser{},
 		&Banner{},
 		&SalesReport{},
-		&Stock{},
+		// &Stock{},
 		&Cart{}, // Add this line
 		&CartItem{},
 	)

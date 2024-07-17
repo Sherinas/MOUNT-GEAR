@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"mountgear/controllers"
+	controllers "mountgear/controllers/User"
 
 	"github.com/gin-gonic/gin"
 )

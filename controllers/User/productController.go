@@ -104,6 +104,10 @@ func AddToCart(c *gin.Context) {
 			ProductID: input.ProductID,
 			Quantity:  input.Quantity,
 		}
+		if input.Quantity > 5 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot add more than 5 quantities of a product"})
+			return
+		}
 		if err := models.DB.Create(&cartItem).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add item to cart"})
 			return
@@ -112,8 +116,10 @@ func AddToCart(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check cart"})
 		return
 	} else {
+
 		// Product already in cart, update quantity
 		cartItem.Quantity += input.Quantity
+
 		if err := models.DB.Save(&cartItem).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})
 			return

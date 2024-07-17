@@ -11,7 +11,8 @@ type Product struct {
 	Price       float64  `gorm:"type:decimal(10,2);check:price >= 0"`
 	Discount    float64  `gorm:"type:decimal(10,2)"`
 	// DiscountPercentage float64 `gorm:"type:decimal(5,2);default:0;check:discount_percentage >= 0 AND discount_percentage <= 99"`
-	Stock     int32     `gorm:"not null; check:stock >= 0"`
+	Stock int32 `gorm:"not null; check:stock >= 0"`
+
 	IsActive  bool      `gorm:"default:true"`
 	Images    []Image   `gorm:"foreignKey:ProductID"`
 	Reviews   []Review  `gorm:"foreignKey:ProductID"`
