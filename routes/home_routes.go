@@ -17,6 +17,12 @@ func HomeRoutes(router *gin.Engine) {
 	router.PUT("/home/shop/update-quantity", controllers.UpdateCartItemQuantity)
 	router.DELETE("/home/shop/deleteCart/:id", controllers.DeleteCartItem)
 
+	//checkout
+
+	router.GET("/home/shop/check-out", controllers.GetCheckOut)
+	router.POST("/home/shop/check-out", controllers.Checkout)
+	router.POST("/home/shop/check-out/edit-Address/:id", controllers.CheckOutEditAddress)
+
 	// user Profile
 	router.GET("/home/profile", controllers.GetUserProfile)
 	router.GET("/home/profile/edit", controllers.GetEditProfile)

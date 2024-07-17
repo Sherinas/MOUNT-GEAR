@@ -1,5 +1,309 @@
 package controllers
 
-func CheckOut() {
+import (
+	"errors"
+	"mountgear/models"
+	"net/http"
+	"strconv"
 
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+func GetCheckOut(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "Unauthorized",
+			"message": "User not authenticated",
+		})
+		return
+	}
+
+	var user models.User
+	var addresses []models.Address
+	var cart models.Cart
+
+	// Fetch user data
+	if err := models.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "Unauthorized",
+			"message": "User not found",
+		})
+		return
+	}
+
+	// Fetch user addresses
+	if err := models.DB.Where("user_id = ?", userID).Find(&addresses).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Addresses not found"})
+		return
+	}
+
+	// Fetch cart with items and products
+	if err := models.DB.Where("user_id = ?", userID).
+		Preload("CartItems").
+		Preload("CartItems.Product").
+		First(&cart).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Cart not found for this user"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to fetch user cart: " + err.Error()})
+		}
+		return
+	}
+
+	// Prepare address response
+	var addressResponse []gin.H
+	for _, addr := range addresses {
+		addressResponse = append(addressResponse, gin.H{
+			"id":            addr.ID,
+			"address_line1": addr.AddressLine1,
+			"address_line2": addr.AddressLine2,
+			"city":          addr.City,
+			"state":         addr.State,
+			"zipcode":       addr.Zipcode,
+			"country":       addr.Country,
+		})
+	}
+
+	// Prepare cart items response and calculate total
+	var cartItemsResponse []gin.H
+	var totalPrice float64
+	for _, item := range cart.CartItems {
+		discountedPrice := item.Product.GetDiscountedPrice()
+		itemTotal := discountedPrice * float64(item.Quantity)
+		totalPrice += itemTotal
+
+		cartItemsResponse = append(cartItemsResponse, gin.H{
+			"product_id":       item.ProductID,
+			"product_name":     item.Product.Name,
+			"quantity":         item.Quantity,
+			"price":            item.Product.Price,
+			"discounted_price": discountedPrice,
+			"item_total":       itemTotal,
+		})
+	}
+
+	// Prepare final response
+	c.JSON(http.StatusOK, gin.H{
+		"status": "Success",
+		"user": gin.H{
+			"name":  user.Name,
+			"email": user.Email,
+			"phone": user.Phone,
+		},
+		"addresses":   addressResponse,
+		"cart_items":  cartItemsResponse,
+		"grand_total": totalPrice,
+	})
+}
+
+func CheckOutEditAddress(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Get addressID from URL parameter
+	addressID, err := strconv.Atoi(c.Param("addressID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address ID"})
+		return
+	}
+
+	// Parse the updated address data from the form
+	var updatedAddress models.Address
+	updatedAddress.AddressLine1 = c.PostForm("AddressLine1")
+	updatedAddress.AddressLine2 = c.PostForm("AddressLine2")
+	updatedAddress.City = c.PostForm("City")
+	updatedAddress.State = c.PostForm("State")
+	updatedAddress.Zipcode = c.PostForm("ZipCode") // Note: Changed to Zipcode to match struct field
+
+	updatedAddress.Country = c.PostForm("Country")
+
+	// Convert "Default" from string to bool
+	isDefault, err := strconv.ParseBool(c.PostForm("Default"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid value for Default"})
+		return
+	}
+	updatedAddress.IsDefault = isDefault
+
+	// Fetch the existing address
+	var existingAddress models.Address
+	if err := models.DB.Where("id = ? AND user_id = ?", addressID, userID).First(&existingAddress).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Address not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch address"})
+		}
+		return
+	}
+
+	// Update the address fields
+	existingAddress.AddressLine1 = updatedAddress.AddressLine1
+	existingAddress.AddressLine2 = updatedAddress.AddressLine2
+	existingAddress.City = updatedAddress.City
+	existingAddress.State = updatedAddress.State
+	existingAddress.Zipcode = updatedAddress.Zipcode
+
+	existingAddress.Country = updatedAddress.Country
+	existingAddress.IsDefault = updatedAddress.IsDefault
+
+	// Start a transaction
+	tx := models.DB.Begin()
+
+	// Update the address
+	if err := tx.Save(&existingAddress).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update address"})
+		return
+	}
+
+	// If this address is set as default, update other addresses
+	if existingAddress.IsDefault {
+		if err := tx.Model(&models.Address{}).
+			Where("user_id = ? AND id != ?", userID, addressID).
+			Update("is_default", false).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update default status of other addresses"})
+			return
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete address update"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Address updated successfully",
+		"address": existingAddress,
+	})
+}
+
+func Checkout(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Parse form data
+	addressID, _ := strconv.Atoi(c.PostForm("address_id"))
+	phone := c.PostForm("phone")
+	paymentMethod := c.PostForm("payment_method")
+
+	// Start a transaction
+	tx := models.DB.Begin()
+
+	// Update user's phone number
+	if err := tx.Model(&models.User{}).Where("id = ?", userID).Update("phone", phone).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update phone number"})
+		return
+	}
+
+	// Fetch the address to use
+	var address models.Address
+	if addressID != 0 {
+		// Use the specified address
+		if err := tx.First(&address, addressID).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusNotFound, gin.H{"error": "Specified address not found"})
+			return
+		}
+	} else {
+		// Use the default address
+		if err := tx.Where("user_id = ? AND is_default = ?", userID, true).First(&address).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusNotFound, gin.H{"error": "No default address found"})
+			return
+		}
+	}
+
+	// Fetch cart
+	var cart models.Cart
+	if err := tx.Where("user_id = ?", userID).Preload("CartItems.Product").First(&cart).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cart not found"})
+		return
+	}
+
+	// Create order
+	order := models.Order{
+		UserID:        userID.(uint),
+		AddressID:     address.ID,
+		PaymentMethod: paymentMethod,
+		Status:        "Pending",
+	}
+
+	var orderItems []models.OrderItem
+
+	for _, cartItem := range cart.CartItems {
+		// Check stock
+		if cartItem.Quantity > int(cartItem.Product.Stock) {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Not enough stock for " + cartItem.Product.Name})
+			return
+		}
+
+		discountedPrice := cartItem.Product.GetDiscountedPrice()
+		orderItem := models.OrderItem{
+			ProductID: cartItem.ProductID,
+			Quantity:  cartItem.Quantity,
+			Price:     discountedPrice,
+		}
+		orderItems = append(orderItems, orderItem)
+
+		order.TotalAmount += discountedPrice * float64(cartItem.Quantity)
+
+		// Update stock
+		if err := tx.Model(&cartItem.Product).Update("stock", gorm.Expr("stock - ?", cartItem.Quantity)).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update stock"})
+			return
+		}
+	}
+
+	order.FinalAmount = order.TotalAmount // Apply any additional discounts here if needed
+
+	if err := tx.Create(&order).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
+		return
+	}
+
+	// Add order items
+	for i := range orderItems {
+		orderItems[i].OrderID = order.ID
+	}
+	if err := tx.Create(&orderItems).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order items"})
+		return
+	}
+
+	// Clear the cart
+	if err := tx.Delete(&cart.CartItems).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear cart"})
+		return
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete checkout"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Order placed successfully",
+		"order_id":   order.ID,
+		"total":      order.FinalAmount,
+		"status":     order.Status,
+		"address_id": order.AddressID,
+	})
 }
