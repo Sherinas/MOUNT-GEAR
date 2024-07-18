@@ -3,30 +3,127 @@ package controllers
 import (
 	"mountgear/models"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
+// func GetShopPage(ctx *gin.Context) {
+// 	var product []models.Product
+
+// 	// if err := models.FetchData(models.DB.Preload("Images", "id IN (SELECT MIN(id) FROM images GROUP BY product_id)"), &product); err != nil {
+// 	// 	ctx.JSON(http.StatusInternalServerError, gin.H{" error": err.Error()})
+// 	// }
+
+// 	query := models.DB.
+// 		Where("is_active = ?", true).
+// 		Preload("Images", "id IN (SELECT MIN(id) FROM images GROUP BY product_id)")
+
+// 	if err := models.FetchData(query, &product); err != nil {
+// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+// 		return
+// 	}
+// 	ctx.JSON(http.StatusOK, gin.H{
+// 		"Status":   "Success",
+// 		"products": product,
+// 	})
+// }
+
 func GetShopPage(ctx *gin.Context) {
-	var product []models.Product
+	var products []models.Product
+	var totalCount int64
 
-	// if err := models.FetchData(models.DB.Preload("Images", "id IN (SELECT MIN(id) FROM images GROUP BY product_id)"), &product); err != nil {
-	// 	ctx.JSON(http.StatusInternalServerError, gin.H{" error": err.Error()})
-	// }
+	// Parse query parameters
+	categoryParam := ctx.Query("category")
+	inStock := ctx.Query("in_stock")
+	minPrice := ctx.Query("min_price")
+	maxPrice := ctx.Query("max_price")
+	search := ctx.Query("search")
+	sort := ctx.Query("sort")
+	// page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	// perPage, _ := strconv.Atoi(ctx.DefaultQuery("per_page", "20"))
 
-	query := models.DB.
-		Where("is_active = ?", true).
-		Preload("Images", "id IN (SELECT MIN(id) FROM images GROUP BY product_id)")
+	// Build the base query
+	query := models.DB.Model(&models.Product{}).
+		Joins("JOIN categories ON products.category_id = categories.id").
+		Where("products.is_active = ? AND categories.is_active = ?", true, true)
 
-	if err := models.FetchData(query, &product); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	// Apply category filter
+	if categoryParam != "" {
+		categoryID, err := strconv.Atoi(categoryParam)
+		if err == nil {
+			query = query.Where("products.category_id = ?", categoryID)
+		} else {
+			query = query.Where("categories.name LIKE ?", "%"+categoryParam+"%")
+		}
+	}
+
+	// Apply other filters
+	if inStock == "true" {
+		query = query.Where("products.stock > 0")
+	}
+	if minPrice != "" {
+		if minPriceFloat, err := strconv.ParseFloat(minPrice, 64); err == nil {
+			query = query.Where("products.price >= ?", minPriceFloat)
+		}
+	}
+	if maxPrice != "" {
+		if maxPriceFloat, err := strconv.ParseFloat(maxPrice, 64); err == nil {
+			query = query.Where("products.price <= ?", maxPriceFloat)
+		}
+	}
+
+	// Apply search
+	if search != "" {
+		search = "%" + strings.ToLower(search) + "%"
+		query = query.Where("LOWER(products.name) LIKE ? OR LOWER(products.description) LIKE ?", search, search)
+	}
+
+	// Apply sorting
+	switch sort {
+	case "popularity":
+		query = query.Order("products.popularity DESC")
+	case "price_asc":
+		query = query.Order("products.price ASC")
+	case "price_desc":
+		query = query.Order("products.price DESC")
+	case "rating":
+		query = query.Order("products.average_rating DESC")
+	case "featured":
+		query = query.Order("products.featured DESC")
+	case "new_arrivals":
+		query = query.Order("products.created_at DESC")
+	case "name_asc":
+		query = query.Order("products.name ASC")
+	case "name_desc":
+		query = query.Order("products.name DESC")
+	default:
+		query = query.Order("products.id ASC") // Default sorting
+	}
+
+	// Count total matching products
+	query.Count(&totalCount)
+
+	// Apply pagination
+	// offset := (page - 1) * perPage
+	// query = query.Offset(offset).Limit(perPage)
+
+	// Execute the query
+	if err := query.Preload("Category").Preload("Images", "id IN (SELECT MIN(id) FROM images GROUP BY product_id)").Find(&products).Error; err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
 		return
 	}
+
 	ctx.JSON(http.StatusOK, gin.H{
-		"products": product,
+		"products":    products,
+		"total_count": totalCount,
+		// "page":        page,
+		// "per_page":    perPage,
 	})
 }
+
 func GetProductDetails(ctx *gin.Context) {
 	id := ctx.Param("id")
 	var product models.Product
@@ -126,5 +223,7 @@ func AddToCart(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Product added to cart successfully"})
+	c.JSON(http.StatusOK, gin.H{
+		"Status":  "Success",
+		"message": "Product added to cart successfully"})
 }
