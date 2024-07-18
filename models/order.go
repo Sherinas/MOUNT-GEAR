@@ -3,17 +3,22 @@ package models
 import "time"
 
 type Order struct {
-	ID            uint        `gorm:"primaryKey"`
-	UserID        uint        `gorm:"not null"`
-	AddressID     uint        `gorm:"not null"`
-	TotalAmount   float64     `gorm:"type:decimal(10,2)"`
-	Discount      float64     `gorm:"type:decimal(10,2)"`
-	FinalAmount   float64     `gorm:"type:decimal(10,2)"`
-	PaymentMethod string      `gorm:"size:50"`
-	Status        string      `gorm:"size:50"`
-	Items         []OrderItem `gorm:"foreignKey:OrderID"`
-	CreatedAt     time.Time   `gorm:"autoCreateTime"`
-	UpdatedAt     time.Time   `gorm:"autoUpdateTime"`
+	ID            uint    `gorm:"primaryKey"`
+	UserID        uint    `gorm:"not null"`
+	AddressID     uint    `gorm:"not null"`
+	TotalAmount   float64 `gorm:"type:decimal(10,2)"`
+	Discount      float64 `gorm:"type:decimal(10,2)"`
+	FinalAmount   float64 `gorm:"type:decimal(10,2)"`
+	PaymentMethod string  `gorm:"size:50"`
+	Status        string  `gorm:"size:50;check:status IN ('Pending', 'Confirmed', 'Shipped', 'Delivered', 'Canceled')"`
+
+	CancellationReason string `gorm:"type:text"`
+	ReturnReason       string `gorm:"type:text"`
+	AdminReturnNote    string `gorm:"type:text"`
+
+	Items     []OrderItem `gorm:"foreignKey:OrderID"`
+	CreatedAt time.Time   `gorm:"autoCreateTime"`
+	UpdatedAt time.Time   `gorm:"autoUpdateTime"`
 }
 
 type OrderItem struct {

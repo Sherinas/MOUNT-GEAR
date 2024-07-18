@@ -39,6 +39,12 @@ func AdminRoutes(router *gin.Engine) {
 		admin.GET("/categories/edit/:id", controllers.GetEditCategoryForm)
 		admin.POST("/categories/:id", controllers.UpdateCategory)
 		admin.GET("/search_Category", controllers.SearchCategories)
+		// order routes
+
+		admin.GET("/orders", controllers.ListOrders)
+		admin.GET("/orders/:id", controllers.OrderDetails)
+		admin.PATCH("/orders/status/:id", controllers.UpdateOrderStatus)
+
 		admin.GET("/logout", controllers.LogoutAdmin)
 
 	}

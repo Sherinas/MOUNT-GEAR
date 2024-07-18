@@ -23,6 +23,12 @@ func HomeRoutes(router *gin.Engine) {
 	router.POST("/home/shop/check-out", controllers.Checkout)
 	router.POST("/home/shop/check-out/edit-Address/:id", controllers.CheckOutEditAddress)
 
+	//order
+	router.GET("/home/shop/order", controllers.GetAllOrders)
+	router.GET("/home/shop/order-detalis/:order_id", controllers.GetOrderDetails)
+	router.POST("/home/shop/order-Cancel/:order_id", controllers.CancelOrder)
+	router.GET("/home/shop/order/canceled-Orders", controllers.CanceledOrders)
+
 	// user Profile
 	router.GET("/home/profile", controllers.GetUserProfile)
 	router.GET("/home/profile/edit", controllers.GetEditProfile)
