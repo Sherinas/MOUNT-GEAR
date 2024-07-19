@@ -13,7 +13,10 @@ import (
 func GetOrderDetails(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"Status":      "error",
+			"Status code": "401",
+			"error":       "User not authenticated"})
 		return
 	}
 
@@ -22,28 +25,43 @@ func GetOrderDetails(c *gin.Context) {
 	var order models.Order
 	if err := models.DB.First(&order, orderID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+			c.JSON(http.StatusNotFound, gin.H{
+				"Status":      "error",
+				"Status code": "404",
+				"error":       "Order not found"})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch order"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Could not fetch order"})
 		}
 		return
 	}
 
 	// Ensure the order belongs to the authenticated user
 	if order.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		c.JSON(http.StatusForbidden, gin.H{
+			"Status":      "error",
+			"Status code": "403",
+			"error":       "Access denied"})
 		return
 	}
 
 	var user models.User
 	if err := models.DB.First(&user, order.UserID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch user information"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Status":      "error",
+			"Status code": "500",
+			"error":       "Could not fetch user information"})
 		return
 	}
 
 	var address models.Address
 	if err := models.DB.First(&address, order.AddressID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch address information"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Status":      "error",
+			"Status code": "500",
+			"error":       "Could not fetch address information"})
 		return
 	}
 
@@ -83,27 +101,37 @@ func GetOrderDetails(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"order":  response,
+		"status":      "success",
+		"Status code": "200",
+		"order":       response,
 	})
 }
 
 func GetAllOrders(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":      "error",
+			"Status code": "401",
+			"error":       "User not authenticated"})
 		return
 	}
 
 	var orders []models.Order
 	if err := models.DB.Where("user_id = ?", userID).Find(&orders).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch orders"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "error",
+			"Status code": "500",
+			"error":       "Could not fetch orders"})
 		return
 	}
 
 	var user models.User
 	if err := models.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch user information"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "error",
+			"Status code": "500",
+			"error":       "Could not fetch user information"})
 		return
 	}
 
@@ -126,7 +154,10 @@ func GetAllOrders(c *gin.Context) {
 	for _, order := range orders {
 		var address models.Address
 		if err := models.DB.First(&address, order.AddressID).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch address information"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":      "error",
+				"Status code": "500",
+				"error":       "Could not fetch address information"})
 			return
 		}
 
@@ -154,68 +185,19 @@ func GetAllOrders(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"orders": response,
+		"status":      "success",
+		"Status code": "200",
+		"orders":      response,
 	})
 }
-
-// func CancelOrder(c *gin.Context) {
-// 	userID, exists := c.Get("userID")
-// 	if !exists {
-// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-// 		return
-// 	}
-
-// 	orderID := c.Param("order_id")
-// 	var order models.Order
-
-// 	// Use a transaction to ensure all operations succeed or fail together
-// 	err := models.DB.Transaction(func(tx *gorm.DB) error {
-// 		// Find the order by ID and user ID to ensure the user owns the order
-// 		if err := tx.Preload("Items").Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error; err != nil {
-// 			if err == gorm.ErrRecordNotFound {
-// 				c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
-// 			} else {
-// 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-// 			}
-// 			return err
-// 		}
-
-// 		// Check if the order status allows cancellation
-// 		if order.Status != "Pending" && order.Status != "Confirmed" {
-// 			c.JSON(http.StatusBadRequest, gin.H{"error": "Order cannot be canceled"})
-// 			return fmt.Errorf("order cannot be canceled")
-// 		}
-
-// 		// Update order status to "Canceled"
-// 		order.Status = "Canceled"
-// 		if err := tx.Save(&order).Error; err != nil {
-// 			return err
-// 		}
-
-// 		// Update the product stock
-// 		for _, item := range order.Items {
-// 			if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
-// 				UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
-// 				return err
-// 			}
-// 		}
-
-// 		return nil
-// 	})
-
-// 	if err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order"})
-// 		return
-// 	}
-
-// 	c.JSON(http.StatusOK, gin.H{"message": "Order canceled successfully"})
-// }
 
 func CancelOrder(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":      "error",
+			"Status code": "401",
+			"error":       "User not authenticated"})
 		return
 	}
 
@@ -226,7 +208,10 @@ func CancelOrder(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "error",
+			"Status code": "400",
+			"error":       "Invalid input"})
 		return
 	}
 
@@ -259,26 +244,36 @@ func CancelOrder(c *gin.Context) {
 	})
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "error",
+			"Status code": "500",
+			"error":       "Failed to cancel order: " + err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"Status":  "Success",
-		"message": "Order canceled successfully"})
+		"Status":      "Success",
+		"Status code": "200",
+		"message":     "Order canceled successfully"})
 }
 
 func CanceledOrders(c *gin.Context) {
 
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"Status":      "Error",
+			"Status code": "401",
+			"error":       "User not authenticated"})
 		return
 	}
 
 	var orders []models.Order
 	if err := models.DB.Where("user_id = ? AND status = ?", userID, "Canceled").Preload("Items").Find(&orders).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch canceled orders"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Status":      "Error",
+			"Status code": "500",
+			"error":       "Could not fetch canceled orders"})
 		return
 	}
 
@@ -306,7 +301,10 @@ func CanceledOrders(c *gin.Context) {
 		for _, item := range order.Items {
 			var product models.Product
 			if err := models.DB.First(&product, item.ProductID).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch product details"})
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":      "Error",
+					"Status code": "500",
+					"error":       "Could not fetch product details"})
 				return
 			}
 
@@ -334,7 +332,8 @@ func CanceledOrders(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"data":   response,
+		"status":      "success",
+		"Status code": "200",
+		"data":        response,
 	})
 }

@@ -42,8 +42,8 @@ func AdminRoutes(router *gin.Engine) {
 		// order routes
 
 		admin.GET("/orders", controllers.ListOrders)
-		admin.GET("/orders/:id", controllers.OrderDetails)
-		admin.PATCH("/orders/status/:id", controllers.UpdateOrderStatus)
+		admin.GET("/orders/:order_id", controllers.OrderDetails)
+		admin.PATCH("/orders/status/:order_id", controllers.UpdateOrderStatus)
 
 		admin.GET("/logout", controllers.LogoutAdmin)
 

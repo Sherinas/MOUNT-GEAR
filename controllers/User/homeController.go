@@ -15,7 +15,7 @@ func GetHomePage(c *gin.Context) {
 		// c.Redirect(http.StatusFound, "/login")
 		c.JSON(200, gin.H{
 			"status":  "error",
-			"message": "You are not logged in",
+			"message": "Please login first",
 		})
 
 		return

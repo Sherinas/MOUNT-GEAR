@@ -13,8 +13,10 @@ func GetCartPage(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Unauthorized",
-			"message": "User not authenticated",
+			"Status":      "error",
+			"Status code": "401",
+			"error":       "Unauthorized",
+			"message":     "User not authenticated",
 		})
 		return
 	}
@@ -24,9 +26,15 @@ func GetCartPage(c *gin.Context) {
 	// Fetch the cart for the user, including CartItems and their Products
 	if err := models.DB.Where("user_id = ?", userID).Preload("CartItems.Product").First(&cart).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Cart not found"})
+			c.JSON(http.StatusNotFound, gin.H{
+				"Status":      "error",
+				"Status code": "404",
+				"error":       "Cart not found"})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch cart"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to fetch cart"})
 		}
 		return
 	}
@@ -52,6 +60,8 @@ func GetCartPage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
+		"Status":      "success",
+		"Status code": "200",
 
 		"cart_id":     cart.ID,
 		"cart_items":  cartItemsResponse,
@@ -63,8 +73,10 @@ func UpdateCartItemQuantity(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Unauthorized",
-			"message": "User not authenticated",
+			"Status":      "error",
+			"Status code": "401",
+			"error":       "Unauthorized",
+			"message":     "User not authenticated",
 		})
 		return
 	}
@@ -83,9 +95,15 @@ func UpdateCartItemQuantity(c *gin.Context) {
 	if err := models.DB.Where("id = ? AND cart_id IN (SELECT id FROM carts WHERE user_id = ?)",
 		requestBody.CartItemID, userID).First(&cartItem).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Cart item not found"})
+			c.JSON(http.StatusNotFound, gin.H{
+				"Status":      "error",
+				"Status code": "404",
+				"error":       "Cart item not found"})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch cart item"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to fetch cart item"})
 		}
 		return
 	}
@@ -93,7 +111,10 @@ func UpdateCartItemQuantity(c *gin.Context) {
 	if requestBody.Quantity == 0 { // this is not going to work
 		// Remove the item from the cart
 		if err := models.DB.Delete(&cartItem).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove item from cart"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to remove item from cart"})
 			return
 		}
 	} else {
@@ -101,16 +122,24 @@ func UpdateCartItemQuantity(c *gin.Context) {
 
 		cartItem.Quantity = requestBody.Quantity
 		if cartItem.Quantity > 5 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Quantity cannot be more than 5"})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Status":      "error",
+				"Status code": "400",
+				"error":       "Quantity cannot be more than 5"})
 			return
 		}
 		if err := models.DB.Save(&cartItem).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item quantity"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to update cart item quantity"})
 			return
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
+		"Status":       "success",
+		"Status code":  "200",
 		"message":      "Cart item updated successfully",
 		"cart_item_id": cartItem.ID,
 		"new_quantity": requestBody.Quantity,
@@ -121,8 +150,10 @@ func DeleteCartItem(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Unauthorized",
-			"message": "User not authenticated",
+			"Status":      "error",
+			"Status code": "401",
+			"error":       "Unauthorized",
+			"message":     "User not authenticated",
 		})
 		return
 	}
@@ -133,19 +164,30 @@ func DeleteCartItem(c *gin.Context) {
 	if err := models.DB.Where("id = ? AND cart_id IN (SELECT id FROM carts WHERE user_id = ?)",
 		cartItemID, userID).First(&cartItem).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Cart item not found"})
+			c.JSON(http.StatusNotFound, gin.H{
+				"Status":      "error",
+				"Status code": "404",
+				"error":       "Cart item not found"})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch cart item"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to fetch cart item"})
 		}
 		return
 	}
 
 	if err := models.DB.Delete(&cartItem).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete item from cart"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Status":      "error",
+			"Status code": "500",
+			"error":       "Failed to delete item from cart"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
+		"Status":          "success",
+		"Status code":     "200",
 		"message":         "Cart item deleted successfully",
 		"deleted_item_id": cartItem.ID,
 	})

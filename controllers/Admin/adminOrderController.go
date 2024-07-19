@@ -183,7 +183,7 @@ func UpdateOrderStatus(c *gin.Context) {
 	log.Printf("%v", order.Status)
 	log.Printf("%v", input.Status)
 
-	if orderID != "Canceled" {
+	if order.Status == "Canceled" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":      "error",
 			"status code": "400",

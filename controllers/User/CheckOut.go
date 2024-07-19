@@ -135,11 +135,12 @@ func CheckOutEditAddress(c *gin.Context) {
 
 	// Parse the updated address data from the form
 	var updatedAddress models.Address
+
 	updatedAddress.AddressLine1 = c.PostForm("AddressLine1")
 	updatedAddress.AddressLine2 = c.PostForm("AddressLine2")
 	updatedAddress.City = c.PostForm("City")
 	updatedAddress.State = c.PostForm("State")
-	updatedAddress.Zipcode = c.PostForm("ZipCode") // Note: Changed to Zipcode to match struct field
+	updatedAddress.Zipcode = c.PostForm("ZipCode")
 	updatedAddress.AddressPhone = c.PostForm("Phone")
 	updatedAddress.Country = c.PostForm("Country")
 
@@ -229,7 +230,10 @@ func CheckOutEditAddress(c *gin.Context) {
 func Checkout(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":      "Error",
+			"status code": "401",
+			"error":       "User not authenticated"})
 		return
 	}
 
@@ -249,7 +253,10 @@ func Checkout(c *gin.Context) {
 	// }
 	if err := tx.Model(&models.Address{}).Where("id = ?", addressID).Update("address_phone", phone).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update address phone number"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "Error",
+			"status code": "500",
+			"error":       "Failed to update address phone number"})
 		return
 	}
 
@@ -361,7 +368,7 @@ func Checkout(c *gin.Context) {
 		}
 	}
 
-	order.FinalAmount = order.TotalAmount // Apply any additional discounts here if needed
+	order.FinalAmount = order.TotalAmount
 
 	if err := tx.Create(&order).Error; err != nil {
 		tx.Rollback()
