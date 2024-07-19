@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"mountgear/models"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func ListProducts(ctx *gin.Context) {
@@ -100,6 +102,25 @@ func CreateProduct(ctx *gin.Context) {
 
 	category, _ := strconv.Atoi(ctx.PostForm("category_id"))
 	input.CategoryID = uint(category)
+
+	var categores models.Category
+	result := models.DB.First(&categores, input.CategoryID)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+		} else {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		}
+		return
+	}
+
+	if !categores.IsActive {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"Status":      "Error",
+			"Status code": "400",
+			"error":       "Category is not available"})
+		return
+	}
 
 	input.Description = ctx.PostForm("description")
 	input.IsActive = true
@@ -298,11 +319,52 @@ func UpdateProduct(ctx *gin.Context) {
 		}
 	}
 
+	var category models.Category
 	if categoryID := ctx.PostForm("category_id"); categoryID != "" {
-		if catID, err := strconv.ParseUint(categoryID, 10, 32); err == nil {
-			updates["category_id"] = uint(catID)
+		catID, err := strconv.ParseUint(categoryID, 10, 32)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"status":      "Error",
+				"status_code": 400,
+				"error":       "Invalid category ID"})
+			return
 		}
+
+		result := models.DB.First(&category, catID)
+		if result.Error != nil {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				ctx.JSON(http.StatusNotFound, gin.H{
+					"status":      "Error",
+					"status_code": 404,
+					"error":       "Category not found"})
+			} else {
+				ctx.JSON(http.StatusInternalServerError, gin.H{
+					"status":      "Error",
+					"status_code": 500,
+					"error":       "Database error"})
+			}
+			return
+		}
+
+		if !category.IsActive {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"status":      "Error",
+				"status_code": 400,
+				"error":       "Category is not available"})
+			return
+		}
+
+		updates["category_id"] = uint(catID)
+	} else {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"status":      "Error",
+			"status_code": 400,
+			"error":       "Category ID is required"})
+		return
 	}
+
+	// If we reach here, the category is valid and active
+	// You can proceed with your logic using the validated category
 
 	// Update the product with the changes
 
