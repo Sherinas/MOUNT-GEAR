@@ -14,8 +14,10 @@ func GetCheckOut(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Unauthorized",
-			"message": "User not authenticated",
+
+			"error":       "Unauthorized",
+			"Status code": "401",
+			"message":     "User not authenticated",
 		})
 		return
 	}
@@ -27,15 +29,20 @@ func GetCheckOut(c *gin.Context) {
 	// Fetch user data
 	if err := models.DB.First(&user, userID).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Unauthorized",
-			"message": "User not found",
+			"Status":      "error",
+			"Status code": "401",
+			"error":       "Unauthorized",
+			"message":     "User not found",
 		})
 		return
 	}
 
 	// Fetch user addresses
 	if err := models.DB.Where("user_id = ?", userID).Find(&addresses).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Addresses not found"})
+		c.JSON(http.StatusNotFound, gin.H{
+			"Status":      "error",
+			"Status code": "404",
+			"error":       "Addresses not found"})
 		return
 	}
 
@@ -45,9 +52,15 @@ func GetCheckOut(c *gin.Context) {
 		Preload("CartItems.Product").
 		First(&cart).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Cart not found for this user"})
+			c.JSON(http.StatusNotFound, gin.H{
+				"Status":      "error",
+				"Status code": "404",
+				"error":       "Cart not found for this user"})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to fetch user cart: " + err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Unable to fetch user cart: " + err.Error()})
 		}
 		return
 	}
@@ -62,6 +75,7 @@ func GetCheckOut(c *gin.Context) {
 			"city":          addr.City,
 			"state":         addr.State,
 			"zipcode":       addr.Zipcode,
+			"phone":         addr.AddressPhone,
 			"country":       addr.Country,
 		})
 	}
@@ -86,11 +100,12 @@ func GetCheckOut(c *gin.Context) {
 
 	// Prepare final response
 	c.JSON(http.StatusOK, gin.H{
-		"status": "Success",
+		"status":      "Success",
+		"status code": "200",
 		"user": gin.H{
 			"name":  user.Name,
 			"email": user.Email,
-			"phone": user.Phone,
+			//"phone": user.Phone,
 		},
 		"addresses":   addressResponse,
 		"cart_items":  cartItemsResponse,
@@ -101,14 +116,20 @@ func GetCheckOut(c *gin.Context) {
 func CheckOutEditAddress(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":      "Error",
+			"status code": "401",
+			"error":       "User not authenticated"})
 		return
 	}
 
 	// Get addressID from URL parameter
 	addressID, err := strconv.Atoi(c.Param("addressID"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "Error",
+			"status code": "400",
+			"error":       "Invalid address ID"})
 		return
 	}
 
@@ -119,13 +140,16 @@ func CheckOutEditAddress(c *gin.Context) {
 	updatedAddress.City = c.PostForm("City")
 	updatedAddress.State = c.PostForm("State")
 	updatedAddress.Zipcode = c.PostForm("ZipCode") // Note: Changed to Zipcode to match struct field
-
+	updatedAddress.AddressPhone = c.PostForm("Phone")
 	updatedAddress.Country = c.PostForm("Country")
 
 	// Convert "Default" from string to bool
 	isDefault, err := strconv.ParseBool(c.PostForm("Default"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid value for Default"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "Error",
+			"status code": "400",
+			"error":       "Invalid value for Default"})
 		return
 	}
 	updatedAddress.IsDefault = isDefault
@@ -134,9 +158,15 @@ func CheckOutEditAddress(c *gin.Context) {
 	var existingAddress models.Address
 	if err := models.DB.Where("id = ? AND user_id = ?", addressID, userID).First(&existingAddress).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Address not found"})
+			c.JSON(http.StatusNotFound, gin.H{
+				"status":      "Error",
+				"status code": "404",
+				"error":       "Address not found"})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch address"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":      "Error",
+				"status code": "500",
+				"error":       "Failed to fetch address"})
 		}
 		return
 	}
@@ -147,7 +177,7 @@ func CheckOutEditAddress(c *gin.Context) {
 	existingAddress.City = updatedAddress.City
 	existingAddress.State = updatedAddress.State
 	existingAddress.Zipcode = updatedAddress.Zipcode
-
+	existingAddress.AddressPhone = updatedAddress.AddressPhone
 	existingAddress.Country = updatedAddress.Country
 	existingAddress.IsDefault = updatedAddress.IsDefault
 
@@ -157,7 +187,11 @@ func CheckOutEditAddress(c *gin.Context) {
 	// Update the address
 	if err := tx.Save(&existingAddress).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update address"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "Error",
+			"status code": "500",
+
+			"error": "Failed to update address"})
 		return
 	}
 
@@ -167,20 +201,28 @@ func CheckOutEditAddress(c *gin.Context) {
 			Where("user_id = ? AND id != ?", userID, addressID).
 			Update("is_default", false).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update default status of other addresses"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":      "Error",
+				"status code": "500",
+				"error":       "Failed to update default status of other addresses"})
 			return
 		}
 	}
 
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete address update"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "Error",
+			"status code": "500",
+			"error":       "Failed to complete address update"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Address updated successfully",
-		"address": existingAddress,
+		"status":      "Success",
+		"status code": "200",
+		"message":     "Address updated successfully",
+		"address":     existingAddress,
 	})
 }
 
@@ -200,26 +242,68 @@ func Checkout(c *gin.Context) {
 	tx := models.DB.Begin()
 
 	// Update user's phone number
-	if err := tx.Model(&models.User{}).Where("id = ?", userID).Update("phone", phone).Error; err != nil {
+	// if err := tx.Model(&models.Address{}).Where("id = ?", userID).Update("phone", phone).Error; err != nil {
+	// 	tx.Rollback()
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update phone number"})
+	// 	return
+	// }
+	if err := tx.Model(&models.Address{}).Where("id = ?", addressID).Update("address_phone", phone).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update phone number"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update address phone number"})
 		return
 	}
 
 	// Fetch the address to use
+	// var address models.Address
+	// if addressID != 0 {
+	// 	// Use the specified address
+	// 	if err := tx.First(&address, addressID).Error; err != nil {
+	// 		tx.Rollback()
+	// 		c.JSON(http.StatusNotFound, gin.H{"error": "Specified address not found"})
+	// 		return
+	// 	}
+	// } else {
+	// 	// Use the default address
+	// 	if err := tx.Where("user_id = ? AND is_default = ?", userID, true).First(&address).Error; err != nil {
+	// 		tx.Rollback()
+	// 		c.JSON(http.StatusNotFound, gin.H{"error": "No default address found"})
+	// 		return
+	// 	}
+	// }
+
 	var address models.Address
 	if addressID != 0 {
-		// Use the specified address
-		if err := tx.First(&address, addressID).Error; err != nil {
+		// Check if the address belongs to the user
+		if err := tx.Where("id = ? AND user_id = ?", addressID, userID).First(&address).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusNotFound, gin.H{"error": "Specified address not found"})
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(http.StatusNotFound, gin.H{
+					"Status":      "error",
+					"Status code": "404",
+					"error":       "Address not found or doesn't belong to the user"})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":      "error",
+					"Status code": "500",
+					"error":       "Failed to fetch address"})
+			}
 			return
 		}
 	} else {
 		// Use the default address
 		if err := tx.Where("user_id = ? AND is_default = ?", userID, true).First(&address).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusNotFound, gin.H{"error": "No default address found"})
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(http.StatusNotFound, gin.H{
+					"Status":      "error",
+					"Status code": "404",
+					"error":       "No default address found"})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":      "error",
+					"Status code": "500",
+					"error":       "Failed to fetch default address"})
+			}
 			return
 		}
 	}
@@ -228,7 +312,10 @@ func Checkout(c *gin.Context) {
 	var cart models.Cart
 	if err := tx.Where("user_id = ?", userID).Preload("CartItems.Product").First(&cart).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusNotFound, gin.H{"error": "Cart not found"})
+		c.JSON(http.StatusNotFound, gin.H{
+			"Status":      "error",
+			"Status code": "404",
+			"error":       "Cart not found"})
 		return
 	}
 
@@ -246,7 +333,10 @@ func Checkout(c *gin.Context) {
 		// Check stock
 		if cartItem.Quantity > int(cartItem.Product.Stock) {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Not enough stock for " + cartItem.Product.Name})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Status":      "error",
+				"Status code": "400",
+				"error":       "Not enough stock for " + cartItem.Product.Name})
 			return
 		}
 
@@ -263,7 +353,10 @@ func Checkout(c *gin.Context) {
 		// Update stock
 		if err := tx.Model(&cartItem.Product).Update("stock", gorm.Expr("stock - ?", cartItem.Quantity)).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update stock"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to update stock"})
 			return
 		}
 	}
@@ -272,7 +365,10 @@ func Checkout(c *gin.Context) {
 
 	if err := tx.Create(&order).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Status":      "error",
+			"Status code": "500",
+			"error":       "Failed to create order"})
 		return
 	}
 
@@ -282,28 +378,39 @@ func Checkout(c *gin.Context) {
 	}
 	if err := tx.Create(&orderItems).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order items"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Status":      "error",
+			"Status code": "500",
+			"error":       "Failed to create order items"})
 		return
 	}
 
 	// Clear the cart
 	if err := tx.Delete(&cart.CartItems).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear cart"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Status":      "error",
+			"Status code": "500",
+			"error":       "Failed to clear cart"})
 		return
 	}
 
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete checkout"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Status": "error",
+
+			"error": "Failed to complete checkout"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    "Order placed successfully",
-		"order_id":   order.ID,
-		"total":      order.FinalAmount,
-		"status":     order.Status,
-		"address_id": order.AddressID,
+		"Status code": "200",
+		"Status":      "success",
+		"message":     "Order placed successfully",
+		"order_id":    order.ID,
+		"total":       order.FinalAmount,
+		"status":      order.Status,
+		"address_id":  order.AddressID,
 	})
 }

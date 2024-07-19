@@ -12,9 +12,10 @@ import (
 
 func GetAdminLoginPage(ctx *gin.Context) {
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Admin login page data",
+	ctx.JSON(http.StatusUnauthorized, gin.H{
+
+		"status":  "error",
+		"message": "Unauthorized ,  Admin Should login",
 	})
 }
 
@@ -31,6 +32,7 @@ func LoginAdmin(ctx *gin.Context) {
 
 		ctx.JSON(http.StatusUnauthorized, gin.H{
 			"error": "Invalid Email ",
+			"code":  "401",
 		})
 		return
 	}
@@ -42,6 +44,7 @@ func LoginAdmin(ctx *gin.Context) {
 
 		ctx.JSON(http.StatusUnauthorized, gin.H{
 			"error": "Invalid Password",
+			"code":  "401",
 		})
 
 		return
@@ -49,20 +52,27 @@ func LoginAdmin(ctx *gin.Context) {
 
 	tokenString, err := utils.GenerateToken(input.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create token"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Could not create token",
+			"code":  "500",
+		})
 
 		return
 	}
 	ctx.SetCookie("admin_token", tokenString, 3600, "/", "localhost", false, true)
 
-	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": "Login successful"})
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"code":    "200",
+		"message": "Login successful"})
 }
 
 func GetAdminDashboard(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": " Dashboard page data",
+		"status":      "success",
+		"status code": "200",
+		"message":     " Dashboard page data",
 	})
 
 }
@@ -70,5 +80,7 @@ func GetAdminDashboard(ctx *gin.Context) {
 func LogoutAdmin(ctx *gin.Context) {
 
 	ctx.SetCookie("admin_token", "", -1, "/", "localhost", false, true)
-	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": "Logout successful"})
+	ctx.JSON(http.StatusOK, gin.H{"status": "success",
+		"Status code": "200",
+		"message":     "Logout successful"})
 }

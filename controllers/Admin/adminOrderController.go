@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"log"
 	"mountgear/models"
 	"net/http"
 	"time"
@@ -14,8 +15,11 @@ func ListOrders(ctx *gin.Context) {
 
 	var orders []models.Order
 
-	if err := models.DB.Find(&orders).Error; err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch orders"})
+	if err := models.FetchData(models.DB, &orders); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"Status":      "Error",
+			"Status code": "500",
+			"error":       "Could not fetch orders"})
 		return
 	}
 
@@ -39,8 +43,9 @@ func ListOrders(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"data":   response,
+		"status":      "success",
+		"status code": "200",
+		"data":        response,
 	})
 }
 
@@ -48,24 +53,37 @@ func OrderDetails(c *gin.Context) {
 	orderID := c.Param("order_id")
 
 	var order models.Order
+
 	if err := models.DB.First(&order, orderID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+			c.JSON(http.StatusNotFound, gin.H{
+				"status":      "error",
+				"status code": "404",
+				"error":       "Order not found"})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch order"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":      "error",
+				"status code": "500",
+				"error":       "Could not fetch order"})
 		}
 		return
 	}
 
 	var user models.User
 	if err := models.DB.First(&user, order.UserID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch user information"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "error",
+			"status code": "500",
+			"error":       "Could not fetch user information"})
 		return
 	}
 
 	var address models.Address
 	if err := models.DB.First(&address, order.AddressID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch address information"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "error",
+			"status code": "500",
+			"error":       "Could not fetch address information"})
 		return
 	}
 
@@ -105,8 +123,9 @@ func OrderDetails(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"order":  response,
+		"status":      "success",
+		"status code": "200",
+		"order":       response,
 	})
 }
 
@@ -119,7 +138,10 @@ func UpdateOrderStatus(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "error",
+			"status code": "400",
+			"error":       "Invalid input"})
 		return
 	}
 
@@ -133,7 +155,10 @@ func UpdateOrderStatus(c *gin.Context) {
 		}
 	}
 	if !isValidStatus {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order status"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "error",
+			"status code": "400",
+			"error":       "Invalid order status"})
 		return
 	}
 
@@ -141,25 +166,49 @@ func UpdateOrderStatus(c *gin.Context) {
 	var order models.Order
 	if err := models.DB.First(&order, orderID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+			c.JSON(http.StatusNotFound, gin.H{
+				"status":      "error",
+				"status code": "404",
+				"error":       "Order not found"})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch order"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":      "error",
+				"status code": "500",
+				"error":       "Could not fetch order"})
 		}
 		return
 	}
 
 	// Update the order status
-	if err := models.DB.Model(&order).Update("status", input.Status).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update order status"})
+	log.Printf("%v", order.Status)
+	log.Printf("%v", input.Status)
+
+	if orderID != "Canceled" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "error",
+			"status code": "400",
+			"error":       "Cannot update canceled order",
+		})
 		return
+	} else {
+		if err := models.DB.Model(&order).Update("status", input.Status).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":      "error",
+				"status code": "500",
+				"error":       "Could not update order status"})
+			return
+		}
+
+		// Return the updated order
+		c.JSON(http.StatusOK, gin.H{
+
+			"status":      "success",
+			"status code": "200",
+			"order": gin.H{
+				"id":     order.ID,
+				"status": order.Status,
+			},
+		})
 	}
 
-	// Return the updated order
-	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"order": gin.H{
-			"id":     order.ID,
-			"status": order.Status,
-		},
-	})
 }

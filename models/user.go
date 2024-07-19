@@ -26,6 +26,7 @@ type Address struct {
 	City         string    `gorm:"size:25"`
 	State        string    `gorm:"size:25"`
 	Zipcode      string    `gorm:"size:10"`
+	AddressPhone string    `gorm:"size:15"`
 	Country      string    `gorm:"size:25"`
 	IsDefault    bool      `gorm:"default:false"`
 	CreatedAt    time.Time `gorm:"autoCreateTime"`
