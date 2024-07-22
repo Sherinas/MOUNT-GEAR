@@ -44,7 +44,7 @@ func AutoMigrate(db *gorm.DB) error {
 	err := db.AutoMigrate(
 		&User{},
 		&Address{},
-		//	&OTP{},
+
 		&Product{},
 		&Image{},
 		&Review{},
@@ -57,6 +57,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&AdminUser{},
 		&Banner{},
 		&SalesReport{},
+		&Wishlist{},
 		// &Stock{},
 		&Cart{}, // Add this line
 		&CartItem{},

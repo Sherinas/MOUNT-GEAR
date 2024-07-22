@@ -13,6 +13,7 @@ import (
 
 func GetUserProfile(c *gin.Context) {
 	userID, exists := c.Get("userID")
+
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error":       "unauthorized",

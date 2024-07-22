@@ -28,6 +28,13 @@ func HomeRoutes(router *gin.Engine) {
 	router.GET("/home/shop/order-detalis/:order_id", controllers.GetOrderDetails)
 	router.POST("/home/shop/order-Cancel/:order_id", controllers.CancelOrder)
 	router.GET("/home/shop/order/canceled-Orders", controllers.CanceledOrders)
+	router.POST("/home/shop/order/:order_id/cancel-item", controllers.CancelOrderItem)
+	router.POST("/home/shop/order/:order_id/update-cancel-item", controllers.UpdateCancelOrderItem)
+
+	//wishlist
+	router.GET("/home/shop/wishlist", controllers.GetWishlist)
+	router.POST("/home/shop/wishlist/:id", controllers.AddWishlist)
+	router.DELETE("/home/shop/wishlist/:id", controllers.DeleteWishlist)
 
 	// user Profile
 	router.GET("/home/profile", controllers.GetUserProfile)

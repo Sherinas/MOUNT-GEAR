@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"mountgear/models"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,10 +21,10 @@ func GetOrderDetails(c *gin.Context) {
 		return
 	}
 
-	orderID := c.Param("order_id") // Assuming the order ID is passed as a URL parameter
+	orderID := c.Param("order_id")
 
 	var order models.Order
-	if err := models.DB.First(&order, orderID).Error; err != nil {
+	if err := models.DB.Preload("Items").First(&order, orderID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"Status":      "error",
@@ -38,7 +39,6 @@ func GetOrderDetails(c *gin.Context) {
 		return
 	}
 
-	// Ensure the order belongs to the authenticated user
 	if order.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{
 			"Status":      "error",
@@ -65,7 +65,6 @@ func GetOrderDetails(c *gin.Context) {
 		return
 	}
 
-	// Construct the full address string
 	fullAddress := fmt.Sprintf("%s, %s, %s, %s, %s, %s",
 		address.AddressLine1,
 		address.AddressLine2,
@@ -74,6 +73,51 @@ func GetOrderDetails(c *gin.Context) {
 		address.Zipcode,
 		address.Country)
 
+	var products []gin.H
+	var totalQuantity int
+	var totalDiscount, totalAmountWithoutDiscount float64
+
+	for _, item := range order.Items {
+		var product models.Product
+		if err := models.DB.Preload("Images", func(db *gorm.DB) *gorm.DB {
+			return db.Limit(1) // This will fetch only one image per product
+		}).First(&product, item.ProductID).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to fetch product",
+			})
+			return
+		}
+
+		var imageURL, imagePath string
+		if len(product.Images) > 0 {
+			imageURL = product.Images[0].ImageURL
+			imagePath = product.Images[0].FilePath
+		}
+
+		itemTotal := product.Price * float64(item.Quantity)
+		itemDiscount := itemTotal * product.Discount / 100
+
+		totalAmountWithoutDiscount += itemTotal
+		totalDiscount += itemDiscount
+
+		productInfo := gin.H{
+			"OrderItemID": item.ID,
+			"ID":          product.ID,
+			"Name":        product.Name,
+			"Price":       product.Price,
+			"Discount":    product.Discount,
+			"Quantity":    item.Quantity,
+			"ImageURL":    imageURL,
+			"ImagePath":   imagePath,
+		}
+		products = append(products, productInfo)
+		totalQuantity += item.Quantity
+	}
+
+	finalAmount := totalAmountWithoutDiscount - totalDiscount
+
 	response := struct {
 		OrderID       uint      `json:"order_id"`
 		Username      string    `json:"username"`
@@ -81,32 +125,34 @@ func GetOrderDetails(c *gin.Context) {
 		Phone         string    `json:"phone"`
 		Address       string    `json:"address"`
 		TotalAmount   float64   `json:"total_amount"`
-		Discount      float64   `json:"discount"`
+		TotalDiscount float64   `json:"total_discount"`
 		FinalAmount   float64   `json:"final_amount"`
 		PaymentMethod string    `json:"payment_method"`
 		Status        string    `json:"status"`
 		CreatedAt     time.Time `json:"created_at"`
+		TotalQuantity int       `json:"total_quantity"`
 	}{
 		OrderID:       order.ID,
 		Username:      user.Name,
 		Email:         user.Email,
-		Phone:         user.Phone,
+		Phone:         address.AddressPhone,
 		Address:       fullAddress,
-		TotalAmount:   order.TotalAmount,
-		Discount:      order.Discount,
-		FinalAmount:   order.FinalAmount,
+		TotalAmount:   totalAmountWithoutDiscount,
+		TotalDiscount: totalDiscount,
+		FinalAmount:   finalAmount,
 		PaymentMethod: order.PaymentMethod,
 		Status:        order.Status,
 		CreatedAt:     order.CreatedAt,
+		TotalQuantity: totalQuantity,
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":      "success",
 		"Status code": "200",
 		"order":       response,
+		"Products":    products,
 	})
 }
-
 func GetAllOrders(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
@@ -118,7 +164,7 @@ func GetAllOrders(c *gin.Context) {
 	}
 
 	var orders []models.Order
-	if err := models.DB.Where("user_id = ?", userID).Find(&orders).Error; err != nil {
+	if err := models.DB.Where("user_id = ? AND status != ?", userID, "Canceled").Preload("Items").Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":      "error",
 			"Status code": "500",
@@ -135,18 +181,27 @@ func GetAllOrders(c *gin.Context) {
 		return
 	}
 
+	type OrderItemResponse struct {
+		OrderItemID      uint    `json:"order_item_id"`
+		ProductID        uint    `json:"product_id"`
+		ProductName      string  `json:"product_name"`
+		ProductImageURL  string  `json:"product_image_url"`
+		ProductImagePath string  `json:"product_image_path"`
+		Quantity         int     `json:"quantity"`
+		Price            float64 `json:"price"`
+	}
+
 	type OrderResponse struct {
-		OrderID       uint      `json:"order_id"`
-		Username      string    `json:"username"`
-		Email         string    `json:"email"`
-		Phone         string    `json:"phone"`
-		Address       string    `json:"address"`
-		TotalAmount   float64   `json:"total_amount"`
-		Discount      float64   `json:"discount"`
-		FinalAmount   float64   `json:"final_amount"`
-		PaymentMethod string    `json:"payment_method"`
-		Status        string    `json:"status"`
-		CreatedAt     time.Time `json:"created_at"`
+		OrderID       uint                `json:"order_id"`
+		Username      string              `json:"username"`
+		Email         string              `json:"email"`
+		Phone         string              `json:"phone"`
+		Address       string              `json:"address"`
+		FinalAmount   float64             `json:"final_amount"`
+		PaymentMethod string              `json:"payment_method"`
+		Status        string              `json:"status"`
+		CreatedAt     time.Time           `json:"created_at"`
+		Items         []OrderItemResponse `json:"items"`
 	}
 
 	var response []OrderResponse
@@ -169,18 +224,66 @@ func GetAllOrders(c *gin.Context) {
 			address.Zipcode,
 			address.Country)
 
+		var orderItems []OrderItemResponse
+		var totalAmountWithoutDiscount, totalDiscount float64
+
+		for _, item := range order.Items {
+			// Skip items with zero quantity
+			if item.Quantity == 0 {
+				continue
+			}
+
+			var product models.Product
+			if err := models.DB.Preload("Images", "id IN (SELECT MIN(id) FROM images WHERE product_id = ? GROUP BY product_id)", item.ProductID).
+				First(&product, item.ProductID).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"status":      "error",
+					"Status code": "500",
+					"error":       "Could not fetch product information"})
+				return
+			}
+
+			var imageURL, imagePath string
+			if len(product.Images) > 0 {
+				imageURL = product.Images[0].ImageURL
+				imagePath = product.Images[0].FilePath
+			}
+
+			itemTotal := product.Price * float64(item.Quantity)
+			itemDiscount := itemTotal * product.Discount / 100
+
+			totalAmountWithoutDiscount += itemTotal
+			totalDiscount += itemDiscount
+
+			orderItems = append(orderItems, OrderItemResponse{
+				OrderItemID:      item.ID,
+				ProductID:        product.ID,
+				ProductName:      product.Name,
+				ProductImageURL:  imageURL,
+				ProductImagePath: imagePath,
+				Quantity:         item.Quantity,
+				Price:            item.Price,
+			})
+		}
+
+		// Skip orders with no items (all items had zero quantity)
+		if len(orderItems) == 0 {
+			continue
+		}
+
+		finalAmount := totalAmountWithoutDiscount - totalDiscount
+
 		response = append(response, OrderResponse{
 			OrderID:       order.ID,
 			Username:      user.Name,
 			Email:         user.Email,
-			Phone:         user.Phone,
+			Phone:         address.AddressPhone,
 			Address:       fullAddress,
-			TotalAmount:   order.TotalAmount,
-			Discount:      order.Discount,
-			FinalAmount:   order.FinalAmount,
+			FinalAmount:   finalAmount,
 			PaymentMethod: order.PaymentMethod,
 			Status:        order.Status,
 			CreatedAt:     order.CreatedAt,
+			Items:         orderItems,
 		})
 	}
 
@@ -222,7 +325,7 @@ func CancelOrder(c *gin.Context) {
 			return err
 		}
 
-		if order.Status != "Pending" && order.Status != "Confirmed" {
+		if order.Status != "Pending" && order.Status != "Confirmed" && order.Status != "Partially Canceled" {
 			return fmt.Errorf("order cannot be canceled")
 		}
 
@@ -254,11 +357,11 @@ func CancelOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"Status":      "Success",
 		"Status code": "200",
-		"message":     "Order canceled successfully"})
+		"message":     "Order canceled successfully",
+	})
 }
 
 func CanceledOrders(c *gin.Context) {
-
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -278,11 +381,13 @@ func CanceledOrders(c *gin.Context) {
 	}
 
 	type ProductDetails struct {
-		ProductID  uint    `json:"product_id"`
-		Name       string  `json:"name"`
-		Quantity   int     `json:"quantity"`
-		Price      float64 `json:"price"`
-		TotalPrice float64 `json:"total_price"`
+		ProductID uint    `json:"product_id"`
+		Name      string  `json:"name"`
+		Quantity  int     `json:"quantity"`
+		Price     float64 `json:"price"`
+
+		ImageURL  string `json:"image_url"`
+		ImagePath string `json:"image_path"`
 	}
 
 	type CanceledOrderResponse struct {
@@ -300,7 +405,9 @@ func CanceledOrders(c *gin.Context) {
 		var products []ProductDetails
 		for _, item := range order.Items {
 			var product models.Product
-			if err := models.DB.First(&product, item.ProductID).Error; err != nil {
+			if err := models.DB.Preload("Images", func(db *gorm.DB) *gorm.DB {
+				return db.Limit(1) // This will fetch only one image per product
+			}).First(&product, item.ProductID).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"Status":      "Error",
 					"Status code": "500",
@@ -308,15 +415,20 @@ func CanceledOrders(c *gin.Context) {
 				return
 			}
 
-			discountedPrice := product.GetDiscountedPrice()
-			totalPrice := float64(item.Quantity) * discountedPrice
+			var imageURL, imagePath string
+			if len(product.Images) > 0 {
+				imageURL = product.Images[0].ImageURL
+				imagePath = product.Images[0].FilePath
+			}
 
 			products = append(products, ProductDetails{
-				ProductID:  item.ProductID,
-				Name:       product.Name,
-				Quantity:   item.Quantity,
-				Price:      discountedPrice,
-				TotalPrice: totalPrice,
+				ProductID: item.ProductID,
+				Name:      product.Name,
+				Quantity:  item.Quantity,
+				Price:     product.Price,
+
+				ImageURL:  imageURL,
+				ImagePath: imagePath,
 			})
 		}
 
@@ -335,5 +447,283 @@ func CanceledOrders(c *gin.Context) {
 		"status":      "success",
 		"Status code": "200",
 		"data":        response,
+	})
+}
+
+func UpdateCancelOrderItem(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":      "error",
+			"Status code": "401",
+			"error":       "User not authenticated"})
+		return
+	}
+
+	orderID, err := strconv.ParseUint(c.Param("order_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "error",
+			"Status code": "400",
+			"error":       "Invalid order ID"})
+		return
+	}
+
+	var input struct {
+		OrderItemID uint   `json:"order_item_id" binding:"required"`
+		Reason      string `json:"reason" binding:"required"`
+		Quantity    int    `json:"quantity" binding:"required,min=1"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "error",
+			"Status code": "400",
+			"error":       "Invalid input: " + err.Error()})
+		return
+	}
+
+	err = models.DB.Transaction(func(tx *gorm.DB) error {
+		var order models.Order
+		if err := tx.Preload("Items").Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error; err != nil {
+			return err
+		}
+
+		if order.Status != "Pending" && order.Status != "Confirmed" && order.Status != "Partially Canceled" {
+			return fmt.Errorf("order cannot be modified in its current status")
+		}
+
+		var itemToCancel models.OrderItem
+		if err := tx.Where("id = ? AND order_id = ?", input.OrderItemID, orderID).First(&itemToCancel).Error; err != nil {
+			return err
+		}
+
+		if itemToCancel.Quantity < input.Quantity {
+			return fmt.Errorf("cannot reduce quantity to more than the ordered quantity")
+		}
+
+		// Update the order item
+		canceledQuantity := input.Quantity
+		itemToCancel.Quantity -= canceledQuantity
+		itemToCancel.CanceledQuantity += canceledQuantity
+		if itemToCancel.Quantity == 0 {
+			itemToCancel.IsCanceled = true
+		}
+
+		if err := tx.Save(&itemToCancel).Error; err != nil {
+			return err
+		}
+
+		// Update product stock
+		if err := tx.Model(&models.Product{}).Where("id = ?", itemToCancel.ProductID).
+			UpdateColumn("stock", gorm.Expr("stock + ?", canceledQuantity)).Error; err != nil {
+			return err
+		}
+
+		// Recalculate order totals
+		var totalAmount, discount float64
+		var allItemsCanceled bool = true
+		for _, item := range order.Items {
+			if !item.IsCanceled {
+				totalAmount += item.Price * float64(item.Quantity)
+				allItemsCanceled = false
+			}
+		}
+
+		// Assume discount calculation logic here
+		// For simplicity, let's say we keep the same discount percentage
+		if order.TotalAmount > 0 {
+			discountPercentage := order.Discount / order.TotalAmount
+			discount = totalAmount * discountPercentage
+		}
+
+		finalAmount := totalAmount - discount
+
+		// Update the order
+		now := time.Now()
+		updates := map[string]interface{}{
+			"TotalAmount": totalAmount,
+			"Discount":    discount,
+			"FinalAmount": finalAmount,
+			"UpdatedAt":   now,
+		}
+
+		if allItemsCanceled {
+			updates["Status"] = "Canceled"
+			updates["CancellationReason"] = "All items in the order were canceled"
+		} else {
+			updates["Status"] = "Partially Canceled"
+			// Append the new cancellation reason to the existing one
+			newReason := fmt.Sprintf("%s; Item %d (Qty: %d) canceled at %s: %s",
+				order.CancellationReason,
+				itemToCancel.ID,
+				canceledQuantity,
+				now.Format(time.RFC3339),
+				input.Reason)
+			updates["CancellationReason"] = newReason
+		}
+
+		if err := tx.Model(&order).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "error",
+			"Status code": "500",
+			"error":       "Failed to update order item: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"Status":      "Success",
+		"Status code": "200",
+		"message":     "Order item updated successfully",
+	})
+}
+
+func CancelOrderItem(c *gin.Context) {
+	// Extract userID from the context
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":      "error",
+			"Status code": "401",
+			"error":       "User not authenticated"})
+		return
+	}
+
+	// Parse the order ID from the URL parameter
+	orderID, err := strconv.ParseUint(c.Param("order_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "error",
+			"Status code": "400",
+			"error":       "Invalid order ID"})
+		return
+	}
+
+	// Define the input structure for the request body
+	var input struct {
+		OrderItemID uint   `json:"order_item_id" binding:"required"`
+		Reason      string `json:"reason" binding:"required"`
+	}
+
+	// Bind the JSON input to the struct
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "error",
+			"Status code": "400",
+			"error":       "Invalid input: " + err.Error()})
+		return
+	}
+
+	// Start a database transaction
+	err = models.DB.Transaction(func(tx *gorm.DB) error {
+		var order models.Order
+		// Fetch the order with its items
+		if err := tx.Preload("Items").Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error; err != nil {
+			return err
+		}
+
+		// Check if the order status allows modification
+		if order.Status != "Pending" && order.Status != "Confirmed" && order.Status != "Partially Canceled" {
+			return fmt.Errorf("order cannot be modified in its current status")
+		}
+
+		var itemToCancel models.OrderItem
+		// Fetch the specific order item to be canceled
+		if err := tx.Where("id = ? AND order_id = ?", input.OrderItemID, orderID).First(&itemToCancel).Error; err != nil {
+			return err
+		}
+
+		// Cancel the entire item
+		canceledQuantity := itemToCancel.Quantity
+		canceledAmount := float64(canceledQuantity) * itemToCancel.Price
+		itemToCancel.Quantity = 0
+		itemToCancel.CanceledQuantity = canceledQuantity
+		itemToCancel.IsCanceled = true
+
+		// Save the updated order item
+		if err := tx.Save(&itemToCancel).Error; err != nil {
+			return err
+		}
+
+		// Update the product stock
+		if err := tx.Model(&models.Product{}).Where("id = ?", itemToCancel.ProductID).
+			UpdateColumn("stock", gorm.Expr("stock + ?", canceledQuantity)).Error; err != nil {
+			return err
+		}
+
+		// Recalculate order totals
+		order.TotalAmount -= canceledAmount
+
+		// Recalculate discount
+		if order.TotalAmount > 0 {
+			discountPercentage := order.Discount / (order.TotalAmount + canceledAmount)
+			order.Discount = order.TotalAmount * discountPercentage
+		} else {
+			order.Discount = 0
+		}
+
+		order.FinalAmount = order.TotalAmount - order.Discount
+
+		// Prepare updates for the order
+		now := time.Now()
+		updates := map[string]interface{}{
+			"TotalAmount": order.TotalAmount,
+			"Discount":    order.Discount,
+			"FinalAmount": order.FinalAmount,
+			"UpdatedAt":   now,
+		}
+
+		// Check if all items in the order are canceled
+		allItemsCanceled := true
+		for _, item := range order.Items {
+			if item.ID != itemToCancel.ID && !item.IsCanceled {
+				allItemsCanceled = false
+				break
+			}
+		}
+
+		// Update order status and cancellation reason
+		if allItemsCanceled {
+			updates["Status"] = "Canceled"
+			updates["CancellationReason"] = "All items in the order were canceled"
+		} else {
+			updates["Status"] = "Partially Canceled"
+			newReason := fmt.Sprintf("%s; Item %d canceled at %s: %s",
+				order.CancellationReason,
+				itemToCancel.ID,
+				now.Format(time.RFC3339),
+				input.Reason)
+			updates["CancellationReason"] = newReason
+		}
+
+		// Apply updates to the order
+		if err := tx.Model(&order).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	// Handle any errors from the transaction
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "error",
+			"Status code": "500",
+			"error":       "Failed to cancel order item: " + err.Error()})
+		return
+	}
+
+	// Send success response
+	c.JSON(http.StatusOK, gin.H{
+		"Status":      "Success",
+		"Status code": "200",
+		"message":     "Order item canceled successfully",
 	})
 }

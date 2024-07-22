@@ -10,6 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// var TempEmail = make(map[string]string)
+// var TempQty = make(map[string]int)
+
 func GetCheckOut(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
@@ -97,6 +100,7 @@ func GetCheckOut(c *gin.Context) {
 			"item_total":       itemTotal,
 		})
 	}
+	// TempEmail["email"] = user.Email
 
 	// Prepare final response
 	c.JSON(http.StatusOK, gin.H{
@@ -113,6 +117,7 @@ func GetCheckOut(c *gin.Context) {
 	})
 }
 
+// did not use
 func CheckOutEditAddress(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
@@ -245,12 +250,6 @@ func Checkout(c *gin.Context) {
 	// Start a transaction
 	tx := models.DB.Begin()
 
-	// Update user's phone number
-	// if err := tx.Model(&models.Address{}).Where("id = ?", userID).Update("phone", phone).Error; err != nil {
-	// 	tx.Rollback()
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update phone number"})
-	// 	return
-	// }
 	if err := tx.Model(&models.Address{}).Where("id = ?", addressID).Update("address_phone", phone).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -259,24 +258,6 @@ func Checkout(c *gin.Context) {
 			"error":       "Failed to update address phone number"})
 		return
 	}
-
-	// Fetch the address to use
-	// var address models.Address
-	// if addressID != 0 {
-	// 	// Use the specified address
-	// 	if err := tx.First(&address, addressID).Error; err != nil {
-	// 		tx.Rollback()
-	// 		c.JSON(http.StatusNotFound, gin.H{"error": "Specified address not found"})
-	// 		return
-	// 	}
-	// } else {
-	// 	// Use the default address
-	// 	if err := tx.Where("user_id = ? AND is_default = ?", userID, true).First(&address).Error; err != nil {
-	// 		tx.Rollback()
-	// 		c.JSON(http.StatusNotFound, gin.H{"error": "No default address found"})
-	// 		return
-	// 	}
-	// }
 
 	var address models.Address
 	if addressID != 0 {
@@ -356,6 +337,7 @@ func Checkout(c *gin.Context) {
 		orderItems = append(orderItems, orderItem)
 
 		order.TotalAmount += discountedPrice * float64(cartItem.Quantity)
+		// TempQty["qty"] = cartItem.Quantity
 
 		// Update stock
 		if err := tx.Model(&cartItem.Product).Update("stock", gorm.Expr("stock - ?", cartItem.Quantity)).Error; err != nil {
@@ -410,6 +392,14 @@ func Checkout(c *gin.Context) {
 			"error": "Failed to complete checkout"})
 		return
 	}
+
+	// if err := services.SendCheckoutConfermation(TempEmail["email"], order.ID, TempQty["qty"]); err != nil {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{
+	// 		"Status":      "error",
+	// 		"Status code": "500",
+	// 		"error":       "Failed to confermation email"})
+	// 	return
+	// }
 
 	c.JSON(http.StatusOK, gin.H{
 		"Status code": "200",

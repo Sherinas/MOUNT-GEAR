@@ -194,7 +194,14 @@ func AddToCart(c *gin.Context) {
 			"error":       "Product not found"})
 		return
 	}
-
+	if !product.IsActive {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Status":      "Error",
+			"Status code": "400",
+			"error":       "Product is not active",
+		})
+		return
+	}
 	// Find or create cart for the user
 	var cart models.Cart
 	if err := models.DB.FirstOrCreate(&cart, models.Cart{UserID: userID.(uint)}).Error; err != nil {

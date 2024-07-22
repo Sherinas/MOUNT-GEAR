@@ -32,9 +32,3 @@ type Address struct {
 	CreatedAt    time.Time `gorm:"autoCreateTime"`
 	UpdatedAt    time.Time `gorm:"autoUpdateTime"`
 }
-
-// type OTP struct {
-// 	ID        uint      `gorm:"primarykey"`
-// 	UserID    uint      `gorm:"not null"`
-// 	CreatedAt time.Time `gorm:"autoCreateTime"`
-// }
