@@ -10,27 +10,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// func GetShopPage(ctx *gin.Context) {
-// 	var product []models.Product
-
-// 	// if err := models.FetchData(models.DB.Preload("Images", "id IN (SELECT MIN(id) FROM images GROUP BY product_id)"), &product); err != nil {
-// 	// 	ctx.JSON(http.StatusInternalServerError, gin.H{" error": err.Error()})
-// 	// }
-
-// 	query := models.DB.
-// 		Where("is_active = ?", true).
-// 		Preload("Images", "id IN (SELECT MIN(id) FROM images GROUP BY product_id)")
-
-// 	if err := models.FetchData(query, &product); err != nil {
-// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-// 		return
-// 	}
-// 	ctx.JSON(http.StatusOK, gin.H{
-// 		"Status":   "Success",
-// 		"products": product,
-// 	})
-// }
-
 func GetShopPage(ctx *gin.Context) {
 	var products []models.Product
 	var totalCount int64

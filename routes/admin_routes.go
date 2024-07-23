@@ -45,6 +45,15 @@ func AdminRoutes(router *gin.Engine) {
 		admin.GET("/orders/:order_id", controllers.OrderDetails)
 		admin.PATCH("/orders/status/:order_id", controllers.UpdateOrderStatus)
 
+		//offer
+		admin.GET("/offers", controllers.ListOffers)
+		admin.GET("/offer_add", controllers.GetNewOfferForm)
+		admin.POST("/offer_add", controllers.CreateOffer)
+
+		admin.GET("/offers/:offerID/edit", controllers.GetEditOfferForm)
+		admin.PUT("/offers/:offerID", controllers.UpdateOffer)
+		admin.DELETE("/offers/:offerID", controllers.DeleteOffer)
+
 		admin.GET("/logout", controllers.LogoutAdmin)
 
 	}

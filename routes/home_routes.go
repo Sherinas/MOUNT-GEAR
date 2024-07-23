@@ -49,6 +49,8 @@ func HomeRoutes(router *gin.Engine) {
 	router.GET("/home/profile/editaddress/:id", controllers.GetEditAddress)
 	router.POST("/home/profile/editaddress/:id", controllers.EditAddress)
 
+	//offer management
+
 	// // delete account
 	// router.GET("/home/profile/delete", controllers.DeleteAccount)
 	// //change password
