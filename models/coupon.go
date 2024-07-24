@@ -4,6 +4,7 @@ import "time"
 
 type Coupon struct {
 	ID        uint      `gorm:"primaryKey"`
+	Name      string    `gorm:"not null;type:varchar(255)"`
 	Code      string    `gorm:"size:50"`
 	Discount  float64   `gorm:"type:decimal(5,2)"`
 	ValidFrom time.Time `gorm:"not null"`
@@ -24,4 +25,15 @@ type Offer struct {
 	ValidTo            time.Time `gorm:"not null"`
 	CreatedAt          time.Time `gorm:"autoCreateTime"`
 	UpdatedAt          time.Time `gorm:"autoUpdateTime"`
+}
+
+type CouponUsage struct {
+	ID        uint      `gorm:"primaryKey"`
+	CouponID  uint      `gorm:"not null;index"`
+	Coupon    Coupon    `gorm:"foreignKey:CouponID"`
+	UserID    uint      `gorm:"not null;index"`
+	User      User      `gorm:"foreignKey:UserID"`
+	UsedAt    time.Time `gorm:"not null"`
+	CreatedAt time.Time `gorm:"autoCreateTime"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }

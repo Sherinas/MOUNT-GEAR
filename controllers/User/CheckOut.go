@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"mountgear/models"
+	"mountgear/utils"
 	"net/http"
 	"strconv"
 
@@ -29,7 +31,6 @@ func GetCheckOut(c *gin.Context) {
 	var addresses []models.Address
 	var cart models.Cart
 
-	// Fetch user data
 	if err := models.DB.First(&user, userID).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"Status":      "error",
@@ -40,7 +41,6 @@ func GetCheckOut(c *gin.Context) {
 		return
 	}
 
-	// Fetch user addresses
 	if err := models.DB.Where("user_id = ?", userID).Find(&addresses).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"Status":      "error",
@@ -49,10 +49,8 @@ func GetCheckOut(c *gin.Context) {
 		return
 	}
 
-	// Fetch cart with items and products
 	if err := models.DB.Where("user_id = ?", userID).
-		Preload("CartItems").
-		Preload("CartItems.Product").
+		Preload("CartItems").Preload("CartItems.Product").
 		First(&cart).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
@@ -68,7 +66,6 @@ func GetCheckOut(c *gin.Context) {
 		return
 	}
 
-	// Prepare address response
 	var addressResponse []gin.H
 	for _, addr := range addresses {
 		addressResponse = append(addressResponse, gin.H{
@@ -83,7 +80,6 @@ func GetCheckOut(c *gin.Context) {
 		})
 	}
 
-	// Prepare cart items response and calculate total
 	var cartItemsResponse []gin.H
 	var totalPrice float64
 	for _, item := range cart.CartItems {
@@ -233,6 +229,9 @@ func CheckOutEditAddress(c *gin.Context) {
 }
 
 func Checkout(c *gin.Context) {
+
+	var coupon models.Coupon
+
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -242,12 +241,12 @@ func Checkout(c *gin.Context) {
 		return
 	}
 
-	// Parse form data
 	addressID, _ := strconv.Atoi(c.PostForm("address_id"))
 	phone := c.PostForm("phone")
 	paymentMethod := c.PostForm("payment_method")
 
-	// Start a transaction
+	Code := c.PostForm("CouponCode")
+
 	tx := models.DB.Begin()
 
 	if err := tx.Model(&models.Address{}).Where("id = ?", addressID).Update("address_phone", phone).Error; err != nil {
@@ -296,7 +295,6 @@ func Checkout(c *gin.Context) {
 		}
 	}
 
-	// Fetch cart
 	var cart models.Cart
 	if err := tx.Where("user_id = ?", userID).Preload("CartItems.Product").First(&cart).Error; err != nil {
 		tx.Rollback()
@@ -307,7 +305,42 @@ func Checkout(c *gin.Context) {
 		return
 	}
 
-	// Create order
+	if err := tx.Where("code ?", Code).First(&coupon).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusNotFound, gin.H{
+			"Status":      "error",
+			"Status code": "404",
+			"error":       "code  not found"})
+		return
+
+	}
+
+	/////////////////////////////
+	var couponDiscount float64
+
+	isValid, err := utils.ValidateCoupon(models.DB, Code, userID)
+	if err != nil {
+		tx.Rollback()
+		fmt.Println("Error:", err)
+		return
+	}
+
+	if isValid {
+
+		if err := tx.Where("code = ?", Code).First(&coupon).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to fetch coupon details"})
+			return
+		}
+		couponDiscount = coupon.Discount
+
+	}
+
+	///////////////////
+
 	order := models.Order{
 		UserID:        userID.(uint),
 		AddressID:     address.ID,

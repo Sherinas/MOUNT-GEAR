@@ -1,10 +1,13 @@
 package utils
 
 import (
+	"errors"
+	"mountgear/models"
 	"regexp"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"gorm.io/gorm"
 )
 
 var jwtSecret = []byte("your_secret_key")
@@ -75,4 +78,34 @@ func ValidPhoneNumber(phone string) bool {
 
 	phoneRegex := regexp.MustCompile(`^\d{10}$`)
 	return phoneRegex.MatchString(phone)
+}
+
+type ValidationResult struct {
+	Valid    bool
+	Discount float64
+	Message  string
+}
+
+func ValidateCoupon(db *gorm.DB, code string, userID interface{}) (bool, error) {
+	var coupon models.Coupon
+
+	err := db.Where("code = ? AND valid_from <= ? AND valid_to >= ?", code, time.Now(), time.Now()).First(&coupon).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, errors.New("coupon not found or expired")
+		}
+		return false, err
+	}
+
+	var usageCount int64
+	err = db.Model(&models.CouponUsage{}).Where("coupon_id = ? AND user_id = ?", coupon.ID, userID).Count(&usageCount).Error
+	if err != nil {
+		return false, err
+	}
+
+	if usageCount > 0 {
+		return false, errors.New("coupon has already been used")
+	}
+
+	return true, nil
 }
