@@ -49,6 +49,11 @@ func HomeRoutes(router *gin.Engine) {
 	router.GET("/home/profile/editaddress/:id", controllers.GetEditAddress)
 	router.POST("/home/profile/editaddress/:id", controllers.EditAddress)
 
+	router.GET("/home/payment", func(c *gin.Context) {
+		c.HTML(200, "payment.html", nil)
+	})
+	router.POST("/home/razorpay-payment", controllers.RazorpayPayment)
+
 	//offer management
 
 	// // delete account

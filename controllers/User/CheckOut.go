@@ -2,11 +2,11 @@ package controllers
 
 import (
 	"errors"
-	"fmt"
 	"mountgear/models"
 	"mountgear/utils"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -88,12 +88,13 @@ func GetCheckOut(c *gin.Context) {
 		totalPrice += itemTotal
 
 		cartItemsResponse = append(cartItemsResponse, gin.H{
-			"product_id":       item.ProductID,
-			"product_name":     item.Product.Name,
-			"quantity":         item.Quantity,
-			"price":            item.Product.Price,
-			"discounted_price": discountedPrice,
-			"item_total":       itemTotal,
+			"product_id":   item.ProductID,
+			"product_name": item.Product.Name,
+			"quantity":     item.Quantity,
+			"price":        item.Product.Price,
+			//"discounted_price": discountedPrice,
+			"discounted":   item.Product.GetDiscountAmount(),
+			"total_Price ": itemTotal,
 		})
 	}
 	// TempEmail["email"] = user.Email
@@ -124,7 +125,6 @@ func CheckOutEditAddress(c *gin.Context) {
 		return
 	}
 
-	// Get addressID from URL parameter
 	addressID, err := strconv.Atoi(c.Param("addressID"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -134,7 +134,6 @@ func CheckOutEditAddress(c *gin.Context) {
 		return
 	}
 
-	// Parse the updated address data from the form
 	var updatedAddress models.Address
 
 	updatedAddress.AddressLine1 = c.PostForm("AddressLine1")
@@ -229,7 +228,6 @@ func CheckOutEditAddress(c *gin.Context) {
 }
 
 func Checkout(c *gin.Context) {
-
 	var coupon models.Coupon
 
 	userID, exists := c.Get("userID")
@@ -244,7 +242,6 @@ func Checkout(c *gin.Context) {
 	addressID, _ := strconv.Atoi(c.PostForm("address_id"))
 	phone := c.PostForm("phone")
 	paymentMethod := c.PostForm("payment_method")
-
 	Code := c.PostForm("CouponCode")
 
 	tx := models.DB.Begin()
@@ -259,8 +256,9 @@ func Checkout(c *gin.Context) {
 	}
 
 	var address models.Address
+
 	if addressID != 0 {
-		// Check if the address belongs to the user
+
 		if err := tx.Where("id = ? AND user_id = ?", addressID, userID).First(&address).Error; err != nil {
 			tx.Rollback()
 			if err == gorm.ErrRecordNotFound {
@@ -305,28 +303,24 @@ func Checkout(c *gin.Context) {
 		return
 	}
 
-	if err := tx.Where("code ?", Code).First(&coupon).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusNotFound, gin.H{
-			"Status":      "error",
-			"Status code": "404",
-			"error":       "code  not found"})
-		return
-
-	}
-
-	/////////////////////////////
 	var couponDiscount float64
+	var isValid bool
 
-	isValid, err := utils.ValidateCoupon(models.DB, Code, userID)
-	if err != nil {
-		tx.Rollback()
-		fmt.Println("Error:", err)
-		return
+	if Code != "" {
+		var err error
+		isValid, err = utils.ValidateCoupon(tx, Code, userID)
+
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Status":      "error",
+				"Status code": "400",
+				"error":       err.Error()})
+			return
+		}
 	}
 
 	if isValid {
-
 		if err := tx.Where("code = ?", Code).First(&coupon).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -335,11 +329,9 @@ func Checkout(c *gin.Context) {
 				"error":       "Failed to fetch coupon details"})
 			return
 		}
+
 		couponDiscount = coupon.Discount
-
 	}
-
-	///////////////////
 
 	order := models.Order{
 		UserID:        userID.(uint),
@@ -349,6 +341,7 @@ func Checkout(c *gin.Context) {
 	}
 
 	var orderItems []models.OrderItem
+	var totalOfferDiscount float64
 
 	for _, cartItem := range cart.CartItems {
 		// Check stock
@@ -361,16 +354,23 @@ func Checkout(c *gin.Context) {
 			return
 		}
 
-		discountedPrice := cartItem.Product.GetDiscountedPrice()
-		orderItem := models.OrderItem{
-			ProductID: cartItem.ProductID,
-			Quantity:  cartItem.Quantity,
-			Price:     discountedPrice,
-		}
-		orderItems = append(orderItems, orderItem)
+		actualPrice := cartItem.Product.Price
 
-		order.TotalAmount += discountedPrice * float64(cartItem.Quantity)
-		// TempQty["qty"] = cartItem.Quantity
+		discountAmount := cartItem.Product.GetDiscountAmount()
+		discountedPrice := actualPrice - discountAmount
+		offerDiscount := discountAmount * float64(cartItem.Quantity)
+
+		OrderItem := models.OrderItem{
+			ProductID:       cartItem.ProductID,
+			Quantity:        cartItem.Quantity,
+			ActualPrice:     actualPrice,
+			DiscountedPrice: discountedPrice,
+		}
+
+		orderItems = append(orderItems, OrderItem)
+
+		order.TotalAmount += actualPrice * float64(cartItem.Quantity)
+		totalOfferDiscount += offerDiscount
 
 		// Update stock
 		if err := tx.Model(&cartItem.Product).Update("stock", gorm.Expr("stock - ?", cartItem.Quantity)).Error; err != nil {
@@ -383,7 +383,166 @@ func Checkout(c *gin.Context) {
 		}
 	}
 
-	order.FinalAmount = order.TotalAmount
+	order.OfferDicount = totalOfferDiscount
+	order.CouponDiscount = order.TotalAmount * (couponDiscount / 100)
+
+	var maxCouponLimit float64 = 10000
+	if order.CouponDiscount > maxCouponLimit { // add alidation message
+		order.CouponDiscount = maxCouponLimit
+	}
+	var minCouponLimit float64 = 5000
+
+	if order.TotalAmount < minCouponLimit {
+		order.CouponDiscount = 0 // add error
+		couponDiscount = 0
+	}
+
+	if couponDiscount > 0 {
+
+		// Create coupon usage record
+		couponUsage := models.CouponUsage{
+
+			CouponID: coupon.ID,
+			UserID:   userID.(uint),
+			UsedAt:   time.Now(),
+		}
+		if err := tx.Create(&couponUsage).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to record coupon usage"})
+
+		}
+	}
+
+	order.FinalAmount = (order.TotalAmount - order.OfferDicount) - order.CouponDiscount
+
+	order.TotalDiscount = order.OfferDicount + order.CouponDiscount
+
+	//..............................................................................................payment code
+
+	// if paymentMethod == "Online" {
+	// 	razorpayClient := razorpay.NewClient(os.Getenv("KEY_ID"), os.Getenv("KEY_SECRET"))
+	// 	paymentOrder, err := razorpayClient.Order.Create(map[string]interface{}{
+	// 		"amount":   order.FinalAmount * 100,
+	// 		"currency": "INR",
+	// 		"receipt":  fmt.Sprintf("%d", order.ID),
+	// 	}, nil)
+	// 	if err != nil {
+	// 		tx.Rollback()
+	// 		c.JSON(http.StatusInternalServerError, gin.H{
+	// 			"code":    500,
+	// 			"status":  "Error",
+	// 			"message": err.Error(),
+	// 		})
+	// 		return
+	// 	}
+	// 	log.Printf("%v", razorpayClient)
+	// 	payment := models.Payment{
+	// 		OrderID:       c.GetUint(paymentOrder["id"].(string)),
+	// 		Amount:        order.FinalAmount,
+	// 		Status:        "Created",
+	// 		TransactionID: string(order.ID),
+	// 	}
+
+	// 	if err := tx.Create(&payment).Error; err != nil {
+	// 		tx.Rollback()
+	// 		c.JSON(http.StatusInternalServerError, gin.H{
+	// 			"Status":      "error",
+	// 			"Status code": "500",
+	// 			"error":       "Failed to create payment",
+	// 		})
+	// 		return
+	// 	}
+
+	// 	if err := tx.Model(&models.Order{}).Where("id = ?", order.ID).Update("payment_id", payment.OrderID).Error; err != nil {
+	// 		tx.Rollback()
+	// 		c.JSON(http.StatusInternalServerError, gin.H{
+	// 			"Status":      "error",
+	// 			"Status code": "500",
+	// 			"error":       "Failed to update order with payment ID",
+	// 		})
+	// 		return
+	// 	}
+	// 	if err := tx.Create(&order).Error; err != nil {
+	// 		tx.Rollback()
+	// 		c.JSON(http.StatusInternalServerError, gin.H{
+	// 			"Status":      "error",
+	// 			"Status code": "500",
+	// 			"error":       "Failed to create order"})
+	// 		return
+	// 	}
+
+	// 	for i := range orderItems {
+	// 		orderItems[i].OrderID = order.ID
+	// 	}
+
+	// 	if err := tx.Create(&orderItems).Error; err != nil {
+	// 		tx.Rollback()
+	// 		c.JSON(http.StatusInternalServerError, gin.H{
+	// 			"Status":      "error",
+	// 			"Status code": "500",
+	// 			"error":       "Failed to create order items"})
+	// 		return
+	// 	}
+
+	// 	// Clear the cart
+	// 	if err := tx.Delete(&cart.CartItems).Error; err != nil {
+	// 		tx.Rollback()
+	// 		c.JSON(http.StatusInternalServerError, gin.H{
+	// 			"Status":      "error",
+	// 			"Status code": "500",
+	// 			"error":       "Failed to clear cart"})
+	// 		return
+	// 	}
+
+	// 	// coupon Usage
+
+	// 	if couponDiscount > 0 {
+	// 		var couponUsage models.CouponUsage
+	// 		if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
+	// 			tx.Rollback()
+	// 			c.JSON(http.StatusInternalServerError, gin.H{
+	// 				"Status":      "error",
+	// 				"Status code": "500",
+	// 				"error":       "Failed to fetch coupon usage"})
+	// 			return
+	// 		}
+
+	// 		if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
+	// 			tx.Rollback()
+	// 			c.JSON(http.StatusInternalServerError, gin.H{
+	// 				"Status":      "error",
+	// 				"Status code": "500",
+	// 				"error":       "Failed to update coupon usage"})
+	// 			return
+	// 		}
+	// 	}
+	// 	// Commit the transaction
+	// 	if err := tx.Commit().Error; err != nil {
+	// 		c.JSON(http.StatusInternalServerError, gin.H{
+	// 			"Status": "error",
+	// 			"error":  "Failed to complete checkout"})
+	// 		return
+	// 	}
+
+	// 	c.JSON(http.StatusOK, gin.H{
+	// 		"Status code":     "200",
+	// 		"Status":          "success",
+	// 		"message":         "Order placed successfully",
+	// 		"order_id":        order.ID,
+	// 		"total":           order.TotalAmount,
+	// 		"offer_discount":  order.OfferDicount,
+	// 		"coupon_discount": order.CouponDiscount,
+	// 		"final_amount":    order.FinalAmount,
+	// 		"status":          order.Status,
+	// 		"address_id":      order.AddressID,
+	// 		"coupon_applied":  couponDiscount > 0,
+	// 	})
+	// }
+	// }
+	//..................................................................................
 
 	if err := tx.Create(&order).Error; err != nil {
 		tx.Rollback()
@@ -394,10 +553,10 @@ func Checkout(c *gin.Context) {
 		return
 	}
 
-	// Add order items
 	for i := range orderItems {
 		orderItems[i].OrderID = order.ID
 	}
+
 	if err := tx.Create(&orderItems).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -417,30 +576,48 @@ func Checkout(c *gin.Context) {
 		return
 	}
 
+	// coupon Usage
+
+	if couponDiscount > 0 {
+		var couponUsage models.CouponUsage
+		if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to fetch coupon usage"})
+			return
+		}
+
+		if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to update coupon usage"})
+			return
+		}
+	}
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"Status": "error",
-
-			"error": "Failed to complete checkout"})
+			"error":  "Failed to complete checkout"})
 		return
 	}
 
-	// if err := services.SendCheckoutConfermation(TempEmail["email"], order.ID, TempQty["qty"]); err != nil {
-	// 	c.JSON(http.StatusInternalServerError, gin.H{
-	// 		"Status":      "error",
-	// 		"Status code": "500",
-	// 		"error":       "Failed to confermation email"})
-	// 	return
-	// }
-
 	c.JSON(http.StatusOK, gin.H{
-		"Status code": "200",
-		"Status":      "success",
-		"message":     "Order placed successfully",
-		"order_id":    order.ID,
-		"total":       order.FinalAmount,
-		"status":      order.Status,
-		"address_id":  order.AddressID,
+		"Status code":     "200",
+		"Status":          "success",
+		"message":         "Order placed successfully",
+		"order_id":        order.ID,
+		"total":           order.TotalAmount,
+		"offer_discount":  order.OfferDicount,
+		"coupon_discount": order.CouponDiscount,
+		"final_amount":    order.FinalAmount,
+		"status":          order.Status,
+		"address_id":      order.AddressID,
+		"coupon_applied":  couponDiscount > 0,
 	})
+
 }

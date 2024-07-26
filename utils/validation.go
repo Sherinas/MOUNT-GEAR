@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"log"
 	"mountgear/models"
 	"regexp"
 	"time"
@@ -80,23 +81,51 @@ func ValidPhoneNumber(phone string) bool {
 	return phoneRegex.MatchString(phone)
 }
 
-type ValidationResult struct {
-	Valid    bool
-	Discount float64
-	Message  string
-}
+// func ValidateCoupon(db *gorm.DB, code string, userID interface{}) (bool, error) {
+// 	var coupon models.Coupon
 
+// 	err := db.Where("code = ? AND valid_from <= ? AND valid_to >= ?", code, coupon.ValidFrom, coupon.ValidTo).First(&coupon).Error
+// 	if err != nil {
+// 		if errors.Is(err, gorm.ErrRecordNotFound) {
+// 			return false, errors.New("coupon not found or expired")
+// 		}
+// 		return false, err
+// 	}
+
+// 	var usageCount int64
+// 	err = db.Model(&models.CouponUsage{}).Where("coupon_id = ? AND user_id = ?", coupon.ID, userID).Count(&usageCount).Error
+// 	if err != nil {
+// 		return false, err
+// 	}
+
+// 	if usageCount > 0 {
+// 		return false, errors.New("coupon has already been used")
+// 	}
+
+//		return true, nil
+//	}
 func ValidateCoupon(db *gorm.DB, code string, userID interface{}) (bool, error) {
 	var coupon models.Coupon
 
-	err := db.Where("code = ? AND valid_from <= ? AND valid_to >= ?", code, time.Now(), time.Now()).First(&coupon).Error
+	// First, fetch the coupon
+	err := db.Where("code = ?", code).First(&coupon).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, errors.New("coupon not found or expired")
+			return false, errors.New("coupon not found")
 		}
 		return false, err
 	}
 
+	// Check if the coupon is currently valid
+
+	log.Printf("%v", coupon.ValidFrom)
+	log.Printf("%v", coupon.ValidTo)
+	now := time.Now()
+	if now.Before(coupon.ValidFrom) || now.After(coupon.ValidTo) {
+		return false, errors.New("coupon is not valid at this time")
+	}
+
+	// Check if the coupon has already been used by this user
 	var usageCount int64
 	err = db.Model(&models.CouponUsage{}).Where("coupon_id = ? AND user_id = ?", coupon.ID, userID).Count(&usageCount).Error
 	if err != nil {
@@ -104,7 +133,7 @@ func ValidateCoupon(db *gorm.DB, code string, userID interface{}) (bool, error) 
 	}
 
 	if usageCount > 0 {
-		return false, errors.New("coupon has already been used")
+		return false, errors.New("coupon has already been used by this user")
 	}
 
 	return true, nil

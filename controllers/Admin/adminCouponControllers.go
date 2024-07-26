@@ -83,7 +83,7 @@ func CreateCoupon(c *gin.Context) {
 		return
 	}
 
-	if models.CheckExists(models.DB, &models.Coupon{}, "LOWER(name) = LOWER(?)", coupon.Name) {
+	if models.CheckExists(models.DB, &models.Coupon{}, "LOWER(name) = LOWER(?)", coupon.Code) {
 		c.JSON(http.StatusConflict, gin.H{
 			"status": "error",
 			"error":  "Coupon with this name already exists",

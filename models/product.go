@@ -75,3 +75,10 @@ func (p *Product) GetDiscountedPrice() float64 {
 	}
 	return p.Price
 }
+
+func (p *Product) GetDiscountAmount() float64 {
+	if p.Discount > 0 {
+		return p.Price * (p.Discount / 100)
+	}
+	return 0
+}

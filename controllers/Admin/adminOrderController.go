@@ -35,12 +35,12 @@ func ListOrders(ctx *gin.Context) {
 		var actualAmount float64
 		for _, item := range order.Items {
 			if !item.IsCanceled {
-				actualAmount += float64(item.Quantity) * item.Price
+				actualAmount += float64(item.Quantity) * item.DiscountedPrice
 			}
 		}
 
 		// Apply discount
-		discountPercentage := order.Discount / order.TotalAmount
+		discountPercentage := order.CouponDiscount / order.TotalAmount
 		actualDiscount := actualAmount * discountPercentage
 		finalAmount := actualAmount - actualDiscount
 

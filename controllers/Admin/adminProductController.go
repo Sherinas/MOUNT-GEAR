@@ -315,7 +315,7 @@ func UpdateProduct(ctx *gin.Context) {
 					"error":       "Discount percentage must be between 0 and 99"})
 				return
 			}
-			updates["discount_percentage"] = discountFloat
+			updates["discount_price"] = discountFloat
 		}
 	}
 

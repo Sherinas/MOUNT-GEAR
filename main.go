@@ -48,8 +48,6 @@ func main() {
 
 	//r.Static("/assets", "./assets")
 
-	r.Static("/public", "./public")
-
 	//r.LoadHTMLGlob(filepath.Join("templates", "**", "*.html"))
 
 	routes.AuthRoutes(r)
@@ -114,6 +112,6 @@ func ensureUploadsDir() {
 // 	return db.Exec(`ALTER TABLE products ADD CONSTRAINT IF NOT EXISTS check_price_positive CHECK (price >= 0)`).Error
 // }
 
-// func AddStockConstraint(db *gorm.DB) error {
-// 	return db.Exec(`ALTER TABLE products ADD CONSTRAINT IF NOT EXISTS check_stock_non_negative CHECK (stock >= 0)`).Error
-// }
+//	func AddStockConstraint(db *gorm.DB) error {
+//		return db.Exec(`ALTER TABLE products ADD CONSTRAINT IF NOT EXISTS check_stock_non_negative CHECK (stock >= 0)`).Error
+//	}

@@ -44,18 +44,21 @@ func GetCartPage(c *gin.Context) {
 
 	for _, item := range cart.CartItems {
 		discountedPrice := item.Product.GetDiscountedPrice()
+
 		itemTotal := discountedPrice * float64(item.Quantity)
 		totalPrice += itemTotal //check the code if discount is 0 what can do
 
 		cartItemsResponse = append(cartItemsResponse, gin.H{
-			"cart_item_id":     item.ID,
-			"product_id":       item.ProductID,
-			"product_name":     item.Product.Name,
-			"quantity":         item.Quantity,
-			"price":            item.Product.Price,
-			"discounted_price": discountedPrice,
-			"discount":         item.Product.Discount,
-			"item_total":       itemTotal,
+			"cart_item_id": item.ID,
+			"product_id":   item.ProductID,
+			"product_name": item.Product.Name,
+			"quantity":     item.Quantity,
+			"price":        item.Product.Price,
+			// "discounted_price": discountedPrice,
+			"discounted": item.Product.GetDiscountAmount(),
+
+			"discount":   item.Product.Discount,
+			"item_total": itemTotal,
 		})
 	}
 

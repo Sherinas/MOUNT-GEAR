@@ -3,22 +3,22 @@ package models
 import "time"
 
 type Order struct {
-	ID            uint    `gorm:"primaryKey"`
-	UserID        uint    `gorm:"not null"`
-	AddressID     uint    `gorm:"not null"`
-	TotalAmount   float64 `gorm:"type:decimal(10,2)"`
-	Discount      float64 `gorm:"type:decimal(10,2)"`
-	FinalAmount   float64 `gorm:"type:decimal(10,2)"`
-	PaymentMethod string  `gorm:"size:50"`
-	Status        string  `gorm:"size:50;check:status IN ('Pending', 'Confirmed', 'Shipped', 'Delivered', 'Canceled', 'Partially Canceled')"`
-
-	CancellationReason string `gorm:"type:text"`
-	ReturnReason       string `gorm:"type:text"`
-	AdminReturnNote    string `gorm:"type:text"`
-
-	Items     []OrderItem `gorm:"foreignKey:OrderID"`
-	CreatedAt time.Time   `gorm:"autoCreateTime"`
-	UpdatedAt time.Time   `gorm:"autoUpdateTime"`
+	ID                 uint        `gorm:"primaryKey"`
+	UserID             uint        `gorm:"not null"`
+	AddressID          uint        `gorm:"not null"`
+	TotalAmount        float64     `gorm:"type:decimal(10,2)"`
+	CouponDiscount     float64     `gorm:"type:decimal(10,2)"`
+	FinalAmount        float64     `gorm:"type:decimal(10,2)"`
+	PaymentMethod      string      ` gorm:"size:50;check:status IN ('COD','Wallet','Online')"`
+	Status             string      `gorm:"size:50;check:status IN ('Pending', 'Confirmed', 'Shipped', 'Delivered', 'Canceled', 'Partially Canceled')"`
+	OfferDicount       float64     `gorm:"type:decimal(10,2)"`
+	TotalDiscount      float64     `gorm:"type:decimal(10,2)"`
+	CancellationReason string      `gorm:"type:text"`
+	ReturnReason       string      `gorm:"type:text"`
+	AdminReturnNote    string      `gorm:"type:text"`
+	Items              []OrderItem `gorm:"foreignKey:OrderID"`
+	CreatedAt          time.Time   `gorm:"autoCreateTime"`
+	UpdatedAt          time.Time   `gorm:"autoUpdateTime"`
 }
 
 type OrderItem struct {
@@ -26,7 +26,8 @@ type OrderItem struct {
 	OrderID          uint      `gorm:"not null"`
 	ProductID        uint      `gorm:"not null"`
 	Quantity         int       `gorm:"not null"`
-	Price            float64   `gorm:"type:decimal(10,2)"`
+	ActualPrice      float64   `gorm:"type:decimal(10,2)"`
+	DiscountedPrice  float64   `gorm:"type:decimal(10,2)"`
 	CreatedAt        time.Time `gorm:"autoCreateTime"`
 	UpdatedAt        time.Time `gorm:"autoUpdateTime"`
 	IsCanceled       bool      `gorm:"default:false"`

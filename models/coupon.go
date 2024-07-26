@@ -27,12 +27,22 @@ type Offer struct {
 	UpdatedAt          time.Time `gorm:"autoUpdateTime"`
 }
 
+// type CouponUsage struct {
+// 	CouponID  uint      `gorm:"not null;index"`
+// 	Coupon    Coupon    `gorm:"foreignKey:CouponID"`
+// 	UserID    uint      `gorm:"not null;index"`
+// 	User      User      `gorm:"foreignKey:UserID"`
+// 	UsedAt    time.Time `gorm:"not null"`
+// 	CreatedAt time.Time `gorm:"autoCreateTime"`
+// 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
+// }
 type CouponUsage struct {
 	ID        uint      `gorm:"primaryKey"`
 	CouponID  uint      `gorm:"not null;index"`
 	Coupon    Coupon    `gorm:"foreignKey:CouponID"`
 	UserID    uint      `gorm:"not null;index"`
 	User      User      `gorm:"foreignKey:UserID"`
+	OrderID   uint      `gorm:"not null;index"`
 	UsedAt    time.Time `gorm:"not null"`
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
