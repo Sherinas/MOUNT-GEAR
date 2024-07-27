@@ -40,6 +40,9 @@ func GetUserProfile(c *gin.Context) {
 		"Phone":     user.Phone,
 		"Addresses": user.Addresses,
 	})
+
+	// c.JSON(http.StatusOK, scripts.StatusResponse(http.StatusOK, "success", user.Addresses))
+
 }
 
 func GetEditProfile(c *gin.Context) {

@@ -390,7 +390,7 @@ func Checkout(c *gin.Context) {
 	if order.CouponDiscount > maxCouponLimit { // add alidation message
 		order.CouponDiscount = maxCouponLimit
 	}
-	var minCouponLimit float64 = 5000
+	var minCouponLimit float64 = 1000
 
 	if order.TotalAmount < minCouponLimit {
 		order.CouponDiscount = 0 // add error

@@ -64,7 +64,9 @@ func LoginAdmin(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"code":    "200",
-		"message": "Login successful"})
+		"message": "Login successful",
+		"tocken":  tokenString,
+	})
 }
 
 func GetAdminDashboard(ctx *gin.Context) {

@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -18,4 +19,12 @@ func PasswordHash(password string) string {
 	}
 
 	return string(hashedPassword)
+}
+
+func StatusResponse(status int, errorMsg string, response interface{}) gin.H {
+	return gin.H{
+		"status code": status,
+		"Status":      errorMsg,
+		"response":    response,
+	}
 }

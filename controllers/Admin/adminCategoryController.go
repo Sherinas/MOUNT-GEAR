@@ -25,6 +25,7 @@ func ListCategories(ctx *gin.Context) {
 		"Status code": "200",
 		"categories":  categories,
 	})
+
 }
 
 func GetNewCategoryForm(ctx *gin.Context) {
