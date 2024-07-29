@@ -160,6 +160,7 @@ func OrderDetails(c *gin.Context) {
 		PaymentMethod      string    `json:"payment_method"`
 		Status             string    `json:"status"`
 		CancellationReason string    `json:"cancellationReason"`
+		ReturenReson       string    `json:"returnReason"`
 		CreatedAt          time.Time `json:"created_at"`
 		TotalQuantity      int       `json:"total_quantity"`
 	}{
@@ -174,6 +175,7 @@ func OrderDetails(c *gin.Context) {
 		PaymentMethod:      order.PaymentMethod,
 		Status:             order.Status,
 		CancellationReason: order.CancellationReason,
+		ReturenReson:       order.ReturnReason,
 
 		CreatedAt:     order.CreatedAt,
 		TotalQuantity: totalQuantity,
@@ -204,7 +206,7 @@ func UpdateOrderStatus(c *gin.Context) {
 	}
 
 	// Validate the status
-	validStatuses := []string{"Pending", "Confirmed", "Shipped", "Delivered", "Canceled"}
+	validStatuses := []string{"Pending", "Confirmed", "Shipped", "Delivered", "Canceled", "Return"}
 	isValidStatus := false
 	for _, status := range validStatuses {
 		if input.Status == status {
@@ -237,7 +239,6 @@ func UpdateOrderStatus(c *gin.Context) {
 		return
 	}
 
-	// Update the order status
 	log.Printf("%v", order.Status)
 	log.Printf("%v", input.Status)
 
@@ -257,7 +258,6 @@ func UpdateOrderStatus(c *gin.Context) {
 			return
 		}
 
-		// Return the updated order
 		c.JSON(http.StatusOK, gin.H{
 
 			"status":      "success",

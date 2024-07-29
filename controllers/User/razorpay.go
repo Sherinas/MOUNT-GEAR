@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"mountgear/models"
 	"net/http"
 	"os"
@@ -21,6 +22,7 @@ func RazorpayPayment(c *gin.Context) {
 		return
 	}
 	err := RazorPaymentVerification(respons["razorpay_signature"], respons["razorpay_order_id"], respons["razorpay_payment_id"])
+
 	if err != nil {
 		fmt.Println("error1:", err)
 
@@ -34,6 +36,8 @@ func RazorpayPayment(c *gin.Context) {
 
 		Status: "Success",
 	}
+
+	log.Printf("%v", payment.TransactionID)
 	if err := models.DB.Where("order_id=?", respons["razorpay_order_id"]).Updates(&payment).Error; err != nil {
 		fmt.Println("error2:", err)
 	}
@@ -43,6 +47,11 @@ func RazorpayPayment(c *gin.Context) {
 }
 
 func RazorPaymentVerification(sign, orderId, paymentId string) error {
+
+	log.Printf("%v", sign)
+	log.Printf("%v", orderId)
+	log.Printf("%v", paymentId)
+
 	signature := sign
 	secret := os.Getenv("SECRET_ID")
 	data := orderId + "|" + paymentId
@@ -52,9 +61,13 @@ func RazorPaymentVerification(sign, orderId, paymentId string) error {
 		panic(err)
 	}
 	sha := hex.EncodeToString(h.Sum(nil))
-	if subtle.ConstantTimeCompare([]byte(sha), []byte(signature)) != 1 {
+	log.Printf("%v", sha)
+
+	if subtle.ConstantTimeCompare([]byte(sha), []byte(signature)) != 0 {
+
 		return errors.New("PAYMENT FAILED")
 	} else {
 		return nil
 	}
+
 }

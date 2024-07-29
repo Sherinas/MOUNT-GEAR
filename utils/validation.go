@@ -2,7 +2,9 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"log"
+	"math/rand"
 	"mountgear/models"
 	"regexp"
 	"time"
@@ -107,7 +109,6 @@ func ValidPhoneNumber(phone string) bool {
 func ValidateCoupon(db *gorm.DB, code string, userID interface{}) (bool, error) {
 	var coupon models.Coupon
 
-	// First, fetch the coupon
 	err := db.Where("code = ?", code).First(&coupon).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -115,8 +116,6 @@ func ValidateCoupon(db *gorm.DB, code string, userID interface{}) (bool, error) 
 		}
 		return false, err
 	}
-
-	// Check if the coupon is currently valid
 
 	log.Printf("%v", coupon.ValidFrom)
 	log.Printf("%v", coupon.ValidTo)
@@ -137,4 +136,17 @@ func ValidateCoupon(db *gorm.DB, code string, userID interface{}) (bool, error) 
 	}
 
 	return true, nil
+}
+
+func generateRandomNumber() string {
+	const charset = "123456789"
+	randomBytes := make([]byte, 6)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		fmt.Println(err)
+	}
+	for i, b := range randomBytes {
+		randomBytes[i] = charset[b%byte(len(charset))]
+	}
+	return string(randomBytes)
 }

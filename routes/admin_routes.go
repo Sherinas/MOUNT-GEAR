@@ -55,15 +55,16 @@ func AdminRoutes(router *gin.Engine) {
 		admin.GET("/coupons", controllers.ListCoupons)
 		admin.GET("/coupon_add", controllers.GetNewCouponForm)
 		admin.POST("/coupon_add", controllers.CreateCoupon)
-		// admin.GET("/coupon_edit/:id", controllers.GetEditCouponForm)
-		// admin.POST("/coupon_edit/:id", controllers.UpdateCoupon)
-
 		admin.DELETE("/coupon_delete/:id", controllers.DeleteCoupon)
 
+		//offers
 		admin.GET("/offers/:offerID/edit", controllers.GetEditOfferForm)
 		admin.PUT("/offers/:offerID", controllers.UpdateOffer)
 		admin.DELETE("/offers/:offerID", controllers.DeleteOffer)
 		admin.GET("/logout", controllers.LogoutAdmin)
+
+		//reports
+		admin.POST("/reports", controllers.SalesReport)
 
 	}
 

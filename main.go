@@ -48,7 +48,7 @@ func main() {
 
 	//r.Static("/assets", "./assets")
 
-	//r.LoadHTMLGlob(filepath.Join("templates", "**", "*.html"))
+	r.LoadHTMLGlob("templates/*")
 
 	routes.AuthRoutes(r)
 	routes.HomeRoutes(r)

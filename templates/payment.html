@@ -23,13 +23,13 @@
     // Function to handle payment process
     function initiatePayment(orderId) {
       var options = {
-        key: 'rzp_test_ZW342DjmlVWLMO', 
+        key: 'rzp_test_xM5vujf7YGHTG3',    
         name: 'E COMMERCE WEBSITE',
         description: 'Payment for Order',
         order_id: orderId,
         handler: function(response) {
           var xhr = new XMLHttpRequest();
-                xhr.open("POST", "/user/razorpay-payment");
+                xhr.open("POST", "/home/razorpay-payment");
                 xhr.setRequestHeader("Content-Type", "application/json");
                 xhr.send(JSON.stringify(response));
         },

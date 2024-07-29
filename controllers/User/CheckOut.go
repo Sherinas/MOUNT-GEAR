@@ -2,13 +2,16 @@ package controllers
 
 import (
 	"errors"
+	"log"
 	"mountgear/models"
 	"mountgear/utils"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/razorpay/razorpay-go"
 	"gorm.io/gorm"
 )
 
@@ -420,204 +423,408 @@ func Checkout(c *gin.Context) {
 
 	order.TotalDiscount = order.OfferDicount + order.CouponDiscount
 
-	//..............................................................................................payment code
+	//.............................................................................................payment code
 
-	// if paymentMethod == "Online" {
-	// 	razorpayClient := razorpay.NewClient(os.Getenv("KEY_ID"), os.Getenv("KEY_SECRET"))
-	// 	paymentOrder, err := razorpayClient.Order.Create(map[string]interface{}{
-	// 		"amount":   order.FinalAmount * 100,
-	// 		"currency": "INR",
-	// 		"receipt":  fmt.Sprintf("%d", order.ID),
-	// 	}, nil)
-	// 	if err != nil {
-	// 		tx.Rollback()
-	// 		c.JSON(http.StatusInternalServerError, gin.H{
-	// 			"code":    500,
-	// 			"status":  "Error",
-	// 			"message": err.Error(),
-	// 		})
-	// 		return
-	// 	}
-	// 	log.Printf("%v", razorpayClient)
-	// 	payment := models.Payment{
-	// 		OrderID:       c.GetUint(paymentOrder["id"].(string)),
-	// 		Amount:        order.FinalAmount,
-	// 		Status:        "Created",
-	// 		TransactionID: string(order.ID),
-	// 	}
+	if paymentMethod == "Online" {
 
-	// 	if err := tx.Create(&payment).Error; err != nil {
-	// 		tx.Rollback()
-	// 		c.JSON(http.StatusInternalServerError, gin.H{
-	// 			"Status":      "error",
-	// 			"Status code": "500",
-	// 			"error":       "Failed to create payment",
-	// 		})
-	// 		return
-	// 	}
-
-	// 	if err := tx.Model(&models.Order{}).Where("id = ?", order.ID).Update("payment_id", payment.OrderID).Error; err != nil {
-	// 		tx.Rollback()
-	// 		c.JSON(http.StatusInternalServerError, gin.H{
-	// 			"Status":      "error",
-	// 			"Status code": "500",
-	// 			"error":       "Failed to update order with payment ID",
-	// 		})
-	// 		return
-	// 	}
-	// 	if err := tx.Create(&order).Error; err != nil {
-	// 		tx.Rollback()
-	// 		c.JSON(http.StatusInternalServerError, gin.H{
-	// 			"Status":      "error",
-	// 			"Status code": "500",
-	// 			"error":       "Failed to create order"})
-	// 		return
-	// 	}
-
-	// 	for i := range orderItems {
-	// 		orderItems[i].OrderID = order.ID
-	// 	}
-
-	// 	if err := tx.Create(&orderItems).Error; err != nil {
-	// 		tx.Rollback()
-	// 		c.JSON(http.StatusInternalServerError, gin.H{
-	// 			"Status":      "error",
-	// 			"Status code": "500",
-	// 			"error":       "Failed to create order items"})
-	// 		return
-	// 	}
-
-	// 	// Clear the cart
-	// 	if err := tx.Delete(&cart.CartItems).Error; err != nil {
-	// 		tx.Rollback()
-	// 		c.JSON(http.StatusInternalServerError, gin.H{
-	// 			"Status":      "error",
-	// 			"Status code": "500",
-	// 			"error":       "Failed to clear cart"})
-	// 		return
-	// 	}
-
-	// 	// coupon Usage
-
-	// 	if couponDiscount > 0 {
-	// 		var couponUsage models.CouponUsage
-	// 		if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
-	// 			tx.Rollback()
-	// 			c.JSON(http.StatusInternalServerError, gin.H{
-	// 				"Status":      "error",
-	// 				"Status code": "500",
-	// 				"error":       "Failed to fetch coupon usage"})
-	// 			return
-	// 		}
-
-	// 		if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
-	// 			tx.Rollback()
-	// 			c.JSON(http.StatusInternalServerError, gin.H{
-	// 				"Status":      "error",
-	// 				"Status code": "500",
-	// 				"error":       "Failed to update coupon usage"})
-	// 			return
-	// 		}
-	// 	}
-	// 	// Commit the transaction
-	// 	if err := tx.Commit().Error; err != nil {
-	// 		c.JSON(http.StatusInternalServerError, gin.H{
-	// 			"Status": "error",
-	// 			"error":  "Failed to complete checkout"})
-	// 		return
-	// 	}
-
-	// 	c.JSON(http.StatusOK, gin.H{
-	// 		"Status code":     "200",
-	// 		"Status":          "success",
-	// 		"message":         "Order placed successfully",
-	// 		"order_id":        order.ID,
-	// 		"total":           order.TotalAmount,
-	// 		"offer_discount":  order.OfferDicount,
-	// 		"coupon_discount": order.CouponDiscount,
-	// 		"final_amount":    order.FinalAmount,
-	// 		"status":          order.Status,
-	// 		"address_id":      order.AddressID,
-	// 		"coupon_applied":  couponDiscount > 0,
-	// 	})
-	// }
-	// }
-	//..................................................................................
-
-	if err := tx.Create(&order).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "error",
-			"Status code": "500",
-			"error":       "Failed to create order"})
-		return
-	}
-
-	for i := range orderItems {
-		orderItems[i].OrderID = order.ID
-	}
-
-	if err := tx.Create(&orderItems).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "error",
-			"Status code": "500",
-			"error":       "Failed to create order items"})
-		return
-	}
-
-	// Clear the cart
-	if err := tx.Delete(&cart.CartItems).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "error",
-			"Status code": "500",
-			"error":       "Failed to clear cart"})
-		return
-	}
-
-	// coupon Usage
-
-	if couponDiscount > 0 {
-		var couponUsage models.CouponUsage
-		if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
+		if err := tx.Create(&order).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"Status":      "error",
 				"Status code": "500",
-				"error":       "Failed to fetch coupon usage"})
+				"error":       "Failed to create order"})
 			return
 		}
 
-		if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
+		for i := range orderItems {
+			orderItems[i].OrderID = order.ID
+		}
+		log.Printf("S%v", order.ID)
+
+		if err := tx.Create(&orderItems).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"Status":      "error",
 				"Status code": "500",
-				"error":       "Failed to update coupon usage"})
+				"error":       "Failed to create order items"})
 			return
 		}
-	}
-	// Commit the transaction
-	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status": "error",
-			"error":  "Failed to complete checkout"})
-		return
-	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"Status code":     "200",
-		"Status":          "success",
-		"message":         "Order placed successfully",
-		"order_id":        order.ID,
-		"total":           order.TotalAmount,
-		"offer_discount":  order.OfferDicount,
-		"coupon_discount": order.CouponDiscount,
-		"final_amount":    order.FinalAmount,
-		"status":          order.Status,
-		"address_id":      order.AddressID,
-		"coupon_applied":  couponDiscount > 0,
-	})
+		// Clear the cart
+		if err := tx.Delete(&cart.CartItems).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to clear cart"})
+			return
+		}
+
+		// coupon Usage
+
+		if couponDiscount > 0 {
+			var couponUsage models.CouponUsage
+			if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":      "error",
+					"Status code": "500",
+					"error":       "Failed to fetch coupon usage"})
+				return
+			}
+
+			if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":      "error",
+					"Status code": "500",
+					"error":       "Failed to update coupon usage"})
+				return
+			}
+
+			razorpayClient := razorpay.NewClient(os.Getenv("KEY_ID"), os.Getenv("KEY_SECRET"))
+			paymentOrder, err := razorpayClient.Order.Create(map[string]interface{}{
+				"amount":   order.FinalAmount * 100,
+				"currency": "INR",
+				"receipt":  "77890039",
+			}, nil)
+			if err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"code":    500,
+					"status":  "Error",
+					"message": err.Error(),
+				})
+				return
+			}
+			log.Printf("ff%v", paymentOrder)
+			log.Printf("%v", order.ID)
+
+			payment := models.Payment{
+
+				OrderID:       paymentOrder["id"].(string),
+				Amount:        order.FinalAmount,
+				Status:        paymentOrder["status"].(string),
+				TransactionID: "",
+			}
+
+			if err := tx.Create(&payment).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":      "error",
+					"Status code": "500",
+					"error":       "Failed to create payment",
+				})
+				return
+			}
+			log.Printf("%v", paymentOrder["id"].(string))
+			if err := tx.Model(&models.Order{}).Where("id = ?", order.ID).Update("payment_id", paymentOrder["id"].(string)).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"status":      "error",
+					"status_code": "500",
+					"error":       "Failed to update order with payment ID: " + err.Error(),
+				})
+				return
+			}
+
+			if err := tx.Commit().Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status": "error",
+					"error":  "Failed to complete checkout"})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"Status code":     "200",
+				"Status":          "success",
+				"message":         "Order placed successfully",
+				"order_id":        order.ID,
+				"total":           order.TotalAmount,
+				"offer_discount":  order.OfferDicount,
+				"coupon_discount": order.CouponDiscount,
+				"final_amount":    order.FinalAmount,
+				"status":          order.Status,
+				"address_id":      order.AddressID,
+				"coupon_applied":  couponDiscount > 0,
+				"payment_ID":      payment.OrderID,
+			})
+		}
+
+	} else if paymentMethod == "Wallet" {
+
+		if err := tx.Create(&order).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to create order"})
+			return
+		}
+
+		for i := range orderItems {
+			orderItems[i].OrderID = order.ID
+		}
+		log.Printf("S%v", order.ID)
+
+		if err := tx.Create(&orderItems).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to create order items"})
+			return
+		}
+
+		// Clear the cart
+		if err := tx.Delete(&cart.CartItems).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to clear cart"})
+			return
+		}
+
+		// coupon Usage
+
+		if couponDiscount > 0 {
+			var couponUsage models.CouponUsage
+			if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":      "error",
+					"Status code": "500",
+					"error":       "Failed to fetch coupon usage"})
+				return
+			}
+
+			if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":      "error",
+					"Status code": "500",
+					"error":       "Failed to update coupon usage"})
+				return
+			}
+		}
+
+		var wallet models.Wallet
+
+		if err := tx.Where("user_id = ?", userID).First(&wallet).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to wallet details"})
+			return
+		}
+
+		wallet.Balance = 1500
+
+		if order.FinalAmount > wallet.Balance {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"Status":      "error",
+				"Status code": "400",
+				"error":       "Insufficient balance in wallet",
+			})
+
+			return
+
+		}
+
+		if order.FinalAmount <= wallet.Balance {
+			wallet.Balance -= order.FinalAmount
+
+			if err := tx.Save(&wallet).Error; err != nil {
+				tx.Rollback()
+				return
+			}
+
+		}
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status": "error",
+				"error":  "Failed to complete checkout"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"Status code":     "200",
+			"Status":          "success",
+			"message":         "Order placed successfully",
+			"order_id":        order.ID,
+			"total":           order.TotalAmount,
+			"offer_discount":  order.OfferDicount,
+			"coupon_discount": order.CouponDiscount,
+			"final_amount":    order.FinalAmount,
+			"status":          order.Status,
+			"address_id":      order.AddressID,
+			"coupon_applied":  couponDiscount > 0,
+			"wallet_balance":  wallet.Balance,
+		})
+
+	} else {
+
+		if err := tx.Create(&order).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to create order"})
+			return
+		}
+
+		for i := range orderItems {
+			orderItems[i].OrderID = order.ID
+		}
+		log.Printf("S%v", order.ID)
+
+		if err := tx.Create(&orderItems).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to create order items"})
+			return
+		}
+
+		// Clear the cart
+		if err := tx.Delete(&cart.CartItems).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status":      "error",
+				"Status code": "500",
+				"error":       "Failed to clear cart"})
+			return
+		}
+
+		// coupon Usage
+
+		if couponDiscount > 0 {
+			var couponUsage models.CouponUsage
+			if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":      "error",
+					"Status code": "500",
+					"error":       "Failed to fetch coupon usage"})
+				return
+			}
+
+			if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"Status":      "error",
+					"Status code": "500",
+					"error":       "Failed to update coupon usage"})
+				return
+			}
+		}
+
+		// Commit the transaction
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"Status": "error",
+				"error":  "Failed to complete checkout"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"Status code":     "200",
+			"Status":          "success",
+			"message":         "Order placed successfully",
+			"order_id":        order.ID,
+			"total":           order.TotalAmount,
+			"offer_discount":  order.OfferDicount,
+			"coupon_discount": order.CouponDiscount,
+			"final_amount":    order.FinalAmount,
+			"status":          order.Status,
+			"address_id":      order.AddressID,
+			"coupon_applied":  couponDiscount > 0,
+		})
+
+	}
 
 }
+
+//..................................................................................
+
+// 	if err := tx.Create(&order).Error; err != nil {
+// 		tx.Rollback()
+// 		c.JSON(http.StatusInternalServerError, gin.H{
+// 			"Status":      "error",
+// 			"Status code": "500",
+// 			"error":       "Failed to create order"})
+// 		return
+// 	}
+
+// 	for i := range orderItems {
+// 		orderItems[i].OrderID = order.ID
+// 	}
+
+// 	if err := tx.Create(&orderItems).Error; err != nil {
+// 		tx.Rollback()
+// 		c.JSON(http.StatusInternalServerError, gin.H{
+// 			"Status":      "error",
+// 			"Status code": "500",
+// 			"error":       "Failed to create order items"})
+// 		return
+// 	}
+
+// 	// Clear the cart
+// 	if err := tx.Delete(&cart.CartItems).Error; err != nil {
+// 		tx.Rollback()
+// 		c.JSON(http.StatusInternalServerError, gin.H{
+// 			"Status":      "error",
+// 			"Status code": "500",
+// 			"error":       "Failed to clear cart"})
+// 		return
+// 	}
+
+// 	// coupon Usage
+
+// 	if couponDiscount > 0 {
+// 		var couponUsage models.CouponUsage
+// 		if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
+// 			tx.Rollback()
+// 			c.JSON(http.StatusInternalServerError, gin.H{
+// 				"Status":      "error",
+// 				"Status code": "500",
+// 				"error":       "Failed to fetch coupon usage"})
+// 			return
+// 		}
+
+// 		if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
+// 			tx.Rollback()
+// 			c.JSON(http.StatusInternalServerError, gin.H{
+// 				"Status":      "error",
+// 				"Status code": "500",
+// 				"error":       "Failed to update coupon usage"})
+// 			return
+// 		}
+// 	}
+// 	// Commit the transaction
+// 	if err := tx.Commit().Error; err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{
+// 			"Status": "error",
+// 			"error":  "Failed to complete checkout"})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusOK, gin.H{
+// 		"Status code":     "200",
+// 		"Status":          "success",
+// 		"message":         "Order placed successfully",
+// 		"order_id":        order.ID,
+// 		"total":           order.TotalAmount,
+// 		"offer_discount":  order.OfferDicount,
+// 		"coupon_discount": order.CouponDiscount,
+// 		"final_amount":    order.FinalAmount,
+// 		"status":          order.Status,
+// 		"address_id":      order.AddressID,
+// 		"coupon_applied":  couponDiscount > 0,
+// 	})
+
+// }

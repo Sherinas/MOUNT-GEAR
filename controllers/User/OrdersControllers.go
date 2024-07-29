@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"mountgear/models"
 	"net/http"
 	"strconv"
@@ -379,6 +381,129 @@ func CancelOrder(c *gin.Context) {
 		"message":     "Order canceled successfully",
 	})
 }
+
+//........................................................................................................................../
+
+func ReturnOrder(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":      "error",
+			"Status code": "401",
+			"error":       "User not authenticated"})
+		return
+	}
+
+	orderID := c.Param("order_id")
+
+	var input struct {
+		ReturnReason string `json:"return_reason" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":      "error",
+			"Status code": "400",
+			"error":       "Invalid input"})
+		return
+	}
+
+	var order models.Order
+
+	err := models.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Preload("Items").Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error; err != nil {
+			return err
+		}
+
+		if order.Status != "Delivered" {
+			return fmt.Errorf("order cannot be canceled after delivary ")
+		}
+
+		order.Status = "Return"
+		order.ReturnReason = input.ReturnReason
+		if err := tx.Save(&order).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "error",
+			"Status code": "500",
+			"error":       "Failed to cancel order: " + err.Error()})
+		return
+	}
+
+	//.......................................................................................................
+	if order.Status == "Return" {
+		var wallet models.Wallet
+
+		if order.PaymentMethod == "Online" {
+			returnAmount := order.FinalAmount - order.CouponDiscount
+
+			err := models.DB.Where("user_id = ?", order.UserID).First(&wallet).Error
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					// Wallet doesn't exist, create a new one
+					newWallet := models.Wallet{
+						UserID:  order.UserID,
+						Balance: returnAmount,
+					}
+					if err := models.DB.Create(&newWallet).Error; err != nil {
+
+						c.JSON(http.StatusInternalServerError, gin.H{
+							"status":  "error",
+							"message": "Failed to create wallet: " + err.Error(),
+						})
+						return
+					}
+				} else {
+					// Some other error occurred
+
+					c.JSON(http.StatusInternalServerError, gin.H{
+						"status":  "error",
+						"message": "Failed to fetch wallet: " + err.Error(),
+					})
+					return
+				}
+			} else {
+
+				if err := models.DB.Model(&wallet).Where("user_ID = ?", userID).Update("balance", gorm.Expr("balance + ?", returnAmount)).Error; err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{
+						"status":  "error",
+						"message": "Failed to update wallet balance: " + err.Error(),
+					})
+					return
+				}
+			}
+
+			log.Printf("Updated wallet for user %d. Return amount: %f", order.UserID, returnAmount)
+
+			for _, item := range order.Items {
+				if err := models.DB.Model(&models.Product{}).
+					Where("id = ?", item.ProductID).
+					UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
+
+					return
+				}
+			} // check is it working
+
+		}
+
+	}
+
+	//.........................................................................................................
+
+	c.JSON(http.StatusOK, gin.H{
+		"Status":      "Success",
+		"Status code": "200",
+		"message":     "Order return requset  successfully sent",
+	})
+}
+
+//..............................................................................................................................
 
 func CanceledOrders(c *gin.Context) {
 	userID, exists := c.Get("userID")
