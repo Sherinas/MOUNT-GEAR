@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"mountgear/models"
 	"mountgear/scripts"
 	"mountgear/utils"
@@ -59,6 +60,8 @@ func LoginAdmin(ctx *gin.Context) {
 
 		return
 	}
+
+	fmt.Println(tokenString)
 	ctx.SetCookie("admin_token", tokenString, 3600, "/", "localhost", false, true)
 
 	ctx.JSON(http.StatusOK, gin.H{
@@ -69,6 +72,71 @@ func LoginAdmin(ctx *gin.Context) {
 	})
 }
 
+// func LoginAdmin(ctx *gin.Context) {
+// 	var user models.AdminUser
+
+// 	// Explicitly get form data
+// 	// input.Email = ctx.PostForm("email")
+// 	// input.Password = ctx.PostForm("password")
+
+// 	var input struct {
+// 		Email    string `json:"email"`
+// 		Password string `json:"password"`
+// 	}
+// 	// Validate input
+// 	if input.Email == "" || input.Password == "" {
+// 		ctx.JSON(http.StatusBadRequest, gin.H{
+// 			"error": "Email and password are required",
+// 			"code":  http.StatusBadRequest,
+// 		})
+// 		return
+// 	}
+
+// 	adminEmail, adminPassword := scripts.GetAdminCredentials()
+
+// 	if input.Email != adminEmail {
+// 		ctx.JSON(http.StatusUnauthorized, gin.H{
+// 			"error": "Invalid credentials",
+// 			"code":  http.StatusUnauthorized,
+// 		})
+// 		return
+// 	}
+
+// 	if err := bcrypt.CompareHashAndPassword([]byte(adminPassword), []byte(input.Password)); err != nil {
+// 		ctx.JSON(http.StatusUnauthorized, gin.H{
+// 			"error": "Invalid credentials",
+// 			"code":  http.StatusUnauthorized,
+// 		})
+// 		return
+// 	}
+
+// 	tokenString, err := utils.GenerateToken(user.ID)
+// 	if err != nil {
+// 		ctx.JSON(http.StatusInternalServerError, gin.H{
+// 			"error": "Could not create token",
+// 			"code":  http.StatusInternalServerError,
+// 		})
+// 		return
+// 	}
+
+// 	// Set HTTP-only cookie
+// 	ctx.SetCookie(
+// 		"admin_token",
+// 		tokenString,
+// 		int(time.Hour.Seconds()),
+// 		"/",
+// 		"localhost", // Change this to your domain in production
+// 		false,       // Use true in production for HTTPS
+// 		true,        // HTTP-only
+// 	)
+
+//		ctx.JSON(http.StatusOK, gin.H{
+//			"status":  "success",
+//			"code":    http.StatusOK,
+//			"message": "Login successful",
+//			"token":   tokenString, // Consider removing this in production
+//		})
+//	}
 func GetAdminDashboard(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{

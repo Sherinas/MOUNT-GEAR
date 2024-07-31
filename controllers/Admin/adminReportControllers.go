@@ -124,7 +124,7 @@ func SalesReport(c *gin.Context) {
 
 func generatePDF(report []SalesReportItem) (string, error) {
 
-	pdfPath := filepath.Join("temp", "sales_report_"+time.Now().Format("20060102150405")+".pdf")
+	pdfPath := filepath.Join("C:/Users/Sherinas/Downloads/", "sales_report_"+time.Now().Format("20060102150405")+".pdf")
 
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
@@ -158,8 +158,8 @@ func generatePDF(report []SalesReportItem) (string, error) {
 	pdf.Ln(-1)
 	pdf.Cell(0, 10, fmt.Sprintf("Total Amount: %.2f", totalAmount))
 
-	tempFilePath := "C:/Users/Sherinas/Downloads/sales_report.pdf"
-	err := pdf.OutputFileAndClose(tempFilePath)
+	//	tempFilePath := "C:/Users/Sherinas/Downloads/sales_report.pdf"
+	err := pdf.OutputFileAndClose(pdfPath)
 	if err != nil {
 		return "", err
 	}

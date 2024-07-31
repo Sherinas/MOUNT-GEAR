@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
@@ -33,7 +32,7 @@ func init() {
 
 func main() {
 
-	ensureUploadsDir()
+	// ensureUploadsDir()
 	db := models.DatabaseSetup()
 	if db == nil {
 		log.Fatalf("Failed to connect to database")
@@ -62,56 +61,7 @@ func main() {
 			c.JSON(http.StatusOK, gin.H{"user_id": userID})
 		})
 	}
-	//delete this lines
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://oauth.pstmn.io"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
+
 	r.Run(":3030")
 
 }
-
-// should delete
-func ensureUploadsDir() {
-	uploadsDir := "uploads"
-	if _, err := os.Stat(uploadsDir); os.IsNotExist(err) {
-		err := os.MkdirAll(uploadsDir, os.ModePerm)
-		if err != nil {
-			log.Fatalf("Failed to create uploads directory: %v", err)
-		}
-	}
-}
-
-// func RunMigrations() error {
-// 	db := models.DatabaseSetup()
-
-// 	if db == nil {
-// 		return fmt.Errorf("failed to connect to database")
-// 	}
-
-// 	if err := models.AutoMigrate(db); err != nil {
-// 		return fmt.Errorf("failed to run migrations: %v", err)
-// 	}
-
-// 	if err := AddPriceConstraint(db); err != nil {
-// 		return fmt.Errorf("failed to add price constraint: %v", err)
-// 	}
-
-// 	if err := AddStockConstraint(db); err != nil {
-// 		return fmt.Errorf("failed to add stock constraint: %v", err)
-// 	}
-
-// 	log.Println("Migrations completed successfully")
-// 	return nil
-// }
-
-// func AddPriceConstraint(db *gorm.DB) error {
-// 	return db.Exec(`ALTER TABLE products ADD CONSTRAINT IF NOT EXISTS check_price_positive CHECK (price >= 0)`).Error
-// }
-
-//	func AddStockConstraint(db *gorm.DB) error {
-//		return db.Exec(`ALTER TABLE products ADD CONSTRAINT IF NOT EXISTS check_stock_non_negative CHECK (stock >= 0)`).Error
-//	}
