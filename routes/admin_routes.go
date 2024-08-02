@@ -10,13 +10,14 @@ import (
 func AdminRoutes(router *gin.Engine) {
 	admin := router.Group("/admin")
 
-	admin.Use(middlewares.AdminAuthMiddleware())
+	admin.GET("/login", controllers.GetAdminLoginPage)
+	admin.POST("/login", controllers.LoginAdmin)
+	//admin.Use(middlewares.AdminAuthMiddleware())
 
 	{
-		admin.GET("/login", controllers.GetAdminLoginPage)
-		admin.POST("/login", controllers.LoginAdmin)
-		admin.GET("/dashboard", controllers.GetAdminDashboard)
 
+		admin.GET("/dashboard", controllers.GetAdminDashboard)
+		admin.Use(middlewares.AdminAuthMiddleware())
 		// product routes
 		admin.GET("/products", controllers.ListProducts)
 		admin.GET("/product_add", controllers.GetNewProductForm)

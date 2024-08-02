@@ -71,7 +71,7 @@ func Login(c *gin.Context) {
 
 	}
 
-	tokenString, err := utils.GenerateToken(user.ID)
+	tokenString, err := utils.GenerateToken(user.ID) //       changed
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"Status":      "error",
@@ -80,12 +80,13 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("token", tokenString, 300*72, "/", "localhost", false, true)
+	// c.SetCookie("token", tokenString, 300*72, "/", "localhost", false, true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"Status":      "success",
 		"Status code": "200",
 		"message":     "Login Successfull",
+		"token":       tokenString,
 	})
 }
 

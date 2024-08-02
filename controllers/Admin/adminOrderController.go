@@ -13,7 +13,10 @@ import (
 
 func ListOrders(ctx *gin.Context) {
 	var orders []models.Order
-	if err := models.FetchData(models.DB.Preload("Items"), &orders); err != nil {
+	if err := models.DB.Preload("Items").
+		Where("payment_status = ?", true).
+		Order("created_at DESC").
+		Find(&orders).Error; err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"Status":      "Error",
 			"Status code": "500",
@@ -22,11 +25,12 @@ func ListOrders(ctx *gin.Context) {
 	}
 
 	type OrderResponse struct {
-		ID        uint      `json:"order_id"`
-		UserID    uint      `json:"user_id"`
-		Status    string    `json:"status"`
-		CreatedAt time.Time `json:"created_at"`
-		Amount    float64   `json:"amount"`
+		ID          uint      `json:"order_id"`
+		UserID      uint      `json:"user_id"`
+		Status      string    `json:"status"`
+		CreatedAt   time.Time `json:"created_at"`
+		Amount      float64   `json:"amount"`
+		Paymenttype string    `json:"paymenttype"`
 	}
 
 	var response []OrderResponse
@@ -45,11 +49,12 @@ func ListOrders(ctx *gin.Context) {
 		finalAmount := actualAmount - actualDiscount
 
 		response = append(response, OrderResponse{
-			ID:        order.ID,
-			UserID:    order.UserID,
-			Status:    order.Status,
-			CreatedAt: order.CreatedAt,
-			Amount:    finalAmount,
+			ID:          order.ID,
+			UserID:      order.UserID,
+			Status:      order.Status,
+			Paymenttype: order.PaymentMethod,
+			CreatedAt:   order.CreatedAt,
+			Amount:      finalAmount,
 		})
 	}
 
@@ -59,6 +64,7 @@ func ListOrders(ctx *gin.Context) {
 		"data":        response,
 	})
 }
+
 func OrderDetails(c *gin.Context) {
 	orderID := c.Param("order_id")
 

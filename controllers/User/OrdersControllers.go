@@ -26,6 +26,7 @@ func GetOrderDetails(c *gin.Context) {
 	orderID := c.Param("order_id")
 
 	var order models.Order
+
 	if err := models.DB.Preload("Items").First(&order, orderID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
@@ -117,6 +118,22 @@ func GetOrderDetails(c *gin.Context) {
 		products = append(products, productInfo)
 		totalQuantity += item.Quantity
 	}
+	var payment models.Payment
+	if err := models.DB.Where("order_id = ?", order.PaymentID).First(&payment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":      "error",
+			"Status code": "500",
+			"error":       "Could not fetch payment information",
+		})
+		return
+	}
+
+	payStatus := ""
+
+	if payment.Status == "created" {
+
+		payStatus = "Pending"
+	}
 
 	//finalAmount := totalAmountWithoutDiscount - totalDiscount
 
@@ -153,10 +170,11 @@ func GetOrderDetails(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"Status code": "200",
-		"order":       response,
-		"Products":    products,
+		"status":         "success",
+		"Status code":    "200",
+		"order":          response,
+		"Products":       products,
+		"Payment Status": payStatus,
 	})
 }
 
@@ -171,7 +189,8 @@ func GetAllOrders(c *gin.Context) {
 	}
 
 	var orders []models.Order
-	if err := models.DB.Where("user_id = ? AND status != ?", userID, "Canceled").Preload("Items").Find(&orders).Error; err != nil {
+
+	if err := models.DB.Where("user_id = ? AND status != ?", userID, "Canceled").Preload("Items").Order("created_at desc").Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":      "error",
 			"Status code": "500",
@@ -276,17 +295,15 @@ func GetAllOrders(c *gin.Context) {
 		if len(orderItems) == 0 {
 			continue
 		}
-
 		//finalAmount := totalAmountWithoutDiscount - totalDiscount
 
 		response = append(response, OrderResponse{
-			OrderID:     order.ID,
-			Username:    user.Name,
-			Email:       user.Email,
-			Phone:       address.AddressPhone,
-			Address:     fullAddress,
-			FinalAmount: order.FinalAmount,
-
+			OrderID:       order.ID,
+			Username:      user.Name,
+			Email:         user.Email,
+			Phone:         address.AddressPhone,
+			Address:       fullAddress,
+			FinalAmount:   order.FinalAmount,
 			PaymentMethod: order.PaymentMethod,
 			Status:        order.Status,
 			CreatedAt:     order.CreatedAt,
@@ -516,7 +533,7 @@ func CanceledOrders(c *gin.Context) {
 	}
 
 	var orders []models.Order
-	if err := models.DB.Where("user_id = ? AND status = ?", userID, "Canceled").Preload("Items").Find(&orders).Error; err != nil {
+	if err := models.DB.Where("user_id = ? AND status = ?", userID, "Canceled").Preload("Items").Order("created_at desc").Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"Status":      "Error",
 			"Status code": "500",
@@ -542,6 +559,7 @@ func CanceledOrders(c *gin.Context) {
 		TotalAmount        float64          `json:"total_amount"`
 		CancellationReason string           `json:"cancellation_reason"`
 		Products           []ProductDetails `json:"products"`
+		OrderType          string           `json:""order_type`
 	}
 
 	var response []CanceledOrderResponse
@@ -580,6 +598,7 @@ func CanceledOrders(c *gin.Context) {
 			OrderID:            order.ID,
 			UserID:             order.UserID,
 			Status:             order.Status,
+			OrderType:          order.PaymentMethod,
 			CreatedAt:          order.CreatedAt,
 			TotalAmount:        order.FinalAmount,
 			CancellationReason: order.CancellationReason,

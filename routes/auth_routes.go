@@ -4,15 +4,13 @@ package routes
 
 import (
 	controllers "mountgear/controllers/User"
-	"mountgear/middlewares"
 
 	"github.com/gin-gonic/gin"
 )
 
 func AuthRoutes(router *gin.Engine) {
 	// Apply the AuthMiddleware to all routes
-	router.Use(middlewares.AuthMiddleware())
-
+	// router.Use(middlewares.AuthMiddleware())
 	router.GET("/login", controllers.GetLoginPage)
 	router.POST("/login", controllers.Login)
 	router.GET("/signup", controllers.GetSignUpPage)

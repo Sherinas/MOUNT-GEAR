@@ -24,6 +24,8 @@ func GetUserProfile(c *gin.Context) {
 	}
 
 	var user models.User
+	var wallet models.Wallet
+	walletbalance := wallet.Balance
 
 	if err := models.DB.Preload("Addresses").First(&user, userID).Error; err != nil { // change to function
 		c.JSON(http.StatusNotFound, gin.H{
@@ -34,11 +36,12 @@ func GetUserProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"ID":        user.ID,
-		"Name":      user.Name,
-		"Email":     user.Email,
-		"Phone":     user.Phone,
-		"Addresses": user.Addresses,
+		"ID":             user.ID,
+		"Name":           user.Name,
+		"Email":          user.Email,
+		"Phone":          user.Phone,
+		"Addresses":      user.Addresses,
+		"wallet Balance": walletbalance,
 	})
 
 	// c.JSON(http.StatusOK, scripts.StatusResponse(http.StatusOK, "success", user.Addresses))

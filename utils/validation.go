@@ -13,6 +13,42 @@ import (
 	"gorm.io/gorm"
 )
 
+// .............................................................................................................................
+// var jwtSecret = []byte("your_secret_key")
+
+// type Claims struct {
+// 	UserID uint `json:"user_id"`
+// 	jwt.StandardClaims
+// }
+
+// func GenerateToken(userID uint) (string, error) {
+// 	expirationTime := time.Now().Add(24 * time.Hour)
+// 	claims := &Claims{
+// 		UserID: userID,
+// 		StandardClaims: jwt.StandardClaims{
+// 			ExpiresAt: expirationTime.Unix(),
+// 		},
+// 	}
+
+// 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+// 	fmt.Println(token)
+// 	return token.SignedString(jwtSecret)
+// }
+
+// func ValidateToken(tokenString string) (*Claims, error) {
+// 	claims := &Claims{}
+// 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+// 		return jwtSecret, nil
+// 	})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if !token.Valid {
+// 		return nil, err
+// 	}
+// 	return claims, nil
+// }
+
 var jwtSecret = []byte("your_secret_key")
 
 type Claims struct {
@@ -20,6 +56,7 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
+// GenerateToken generates a JWT for a given user ID
 func GenerateToken(userID uint) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := &Claims{
@@ -30,24 +67,22 @@ func GenerateToken(userID uint) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	fmt.Println(token)
 	return token.SignedString(jwtSecret)
 }
 
+// ValidateToken validates a JWT and returns the claims
 func ValidateToken(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	if !token.Valid {
-		return nil, err
+	if err != nil || !token.Valid {
+		return nil, errors.New("invalid token")
 	}
 	return claims, nil
 }
 
+// .............................................................................................................
 func EmailValidation(email string) bool {
 
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
@@ -139,7 +174,7 @@ func ValidateCoupon(db *gorm.DB, code string, userID interface{}) (bool, error) 
 	return true, nil
 }
 
-func generateRandomNumber() string {
+func generateRandomNumber() string { // not used
 	const charset = "123456789"
 	randomBytes := make([]byte, 6)
 	_, err := rand.Read(randomBytes)
@@ -150,4 +185,22 @@ func generateRandomNumber() string {
 		randomBytes[i] = charset[b%byte(len(charset))]
 	}
 	return string(randomBytes)
+}
+func generateRandomCode() string {
+	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	codeLength := 8
+
+	randomBytes := make([]byte, codeLength)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		fmt.Println("Error generating random bytes:", err)
+		return ""
+	}
+
+	code := make([]byte, codeLength)
+	for i, b := range randomBytes {
+		code[i] = charset[b%byte(len(charset))]
+	}
+
+	return string(code)
 }

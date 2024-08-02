@@ -17,7 +17,6 @@
   <!-- Payment button -->
   <button id="payButton" style="display: none;">Pay Now</button>
 
- 
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script>
     // Function to handle payment process
@@ -29,9 +28,9 @@
         order_id: orderId,
         handler: function(response) {
           var xhr = new XMLHttpRequest();
-                xhr.open("POST", "/home/razorpay-payment");
-                xhr.setRequestHeader("Content-Type", "application/json");
-                xhr.send(JSON.stringify(response));
+          xhr.open("POST", "/home/razorpay-payment");
+          xhr.setRequestHeader("Content-Type", "application/json");
+          xhr.send(JSON.stringify(response));
         },
         prefill: {
           name: 'Customer Name',
@@ -43,8 +42,22 @@
         }
       };
 
-      var rzp = new Razorpay(options);
-      rzp.open();
+      var rzp1 = new Razorpay(options);
+      rzp1.on('payment.failed', function (response) {
+        var errorData = {
+          error_code: "failed",
+          order_id: orderId // Include the order ID in the error response
+        };
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/home/razorpay-payment");
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.send(JSON.stringify(errorData));
+
+        alert('Payment failed: ' + response.error.description);
+      });
+
+      rzp1.open();
     }
 
     // Event listener for form submission
@@ -68,7 +81,6 @@
       var orderId = document.getElementById('orderIdInput').value;
       initiatePayment(orderId);
     });
-    
   </script>
 </body>
 </html>

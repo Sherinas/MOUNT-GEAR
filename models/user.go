@@ -16,6 +16,8 @@ type User struct {
 	Addresses           []Address `gorm:"foreignKey:UserID"`
 	Orders              []Order   `gorm:"foreignKey:UserID"`
 	OtpExpiry           time.Time `gorm:"not null"`
+	ReferralCode        string    `gorm:"uniqueIndex"`
+	ReferredBy          string    `gorm:"size:100"`
 }
 
 type Address struct {

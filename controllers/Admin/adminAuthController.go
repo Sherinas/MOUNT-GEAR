@@ -13,10 +13,10 @@ import (
 
 func GetAdminLoginPage(ctx *gin.Context) {
 
-	ctx.JSON(http.StatusUnauthorized, gin.H{
+	ctx.JSON(http.StatusOK, gin.H{
 
-		"status":  "error",
-		"message": "Unauthorized ,  Admin Should login",
+		"status":  "Success",
+		"message": "please login",
 	})
 }
 
@@ -51,7 +51,9 @@ func LoginAdmin(ctx *gin.Context) {
 		return
 	}
 
-	tokenString, err := utils.GenerateToken(input.ID)
+	fmt.Println(input.ID)
+
+	tokenString, err := utils.GenerateToken(input.ID) //chnaged
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Could not create token",
@@ -61,8 +63,8 @@ func LoginAdmin(ctx *gin.Context) {
 		return
 	}
 
-	fmt.Println(tokenString)
-	ctx.SetCookie("admin_token", tokenString, 3600, "/", "localhost", false, true)
+	// fmt.Println(tokenString)
+	// ctx.SetCookie("admin_token", tokenString, 3600, "/", "localhost", false, true)
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -119,17 +121,6 @@ func LoginAdmin(ctx *gin.Context) {
 // 		return
 // 	}
 
-// 	// Set HTTP-only cookie
-// 	ctx.SetCookie(
-// 		"admin_token",
-// 		tokenString,
-// 		int(time.Hour.Seconds()),
-// 		"/",
-// 		"localhost", // Change this to your domain in production
-// 		false,       // Use true in production for HTTPS
-// 		true,        // HTTP-only
-// 	)
-
 //		ctx.JSON(http.StatusOK, gin.H{
 //			"status":  "success",
 //			"code":    http.StatusOK,
@@ -149,7 +140,7 @@ func GetAdminDashboard(ctx *gin.Context) {
 
 func LogoutAdmin(ctx *gin.Context) {
 
-	ctx.SetCookie("admin_token", "", -1, "/", "localhost", false, true)
+	// ctx.SetCookie("admin_token", "", -1, "/", "localhost", false, true)
 	ctx.JSON(http.StatusOK, gin.H{"status": "success",
 		"Status code": "200",
 		"message":     "Logout successful"})
