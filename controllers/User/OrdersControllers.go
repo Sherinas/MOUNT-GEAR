@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
 	"strconv"
@@ -13,198 +14,25 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetOrderDetails(c *gin.Context) {
-	userID, exists := c.Get("userID")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"Status":      "error",
-			"Status code": "401",
-			"error":       "User not authenticated"})
-		return
-	}
-
-	orderID := c.Param("order_id")
-
-	var order models.Order
-
-	if err := models.DB.Preload("Items").First(&order, orderID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"Status":      "error",
-				"Status code": "404",
-				"error":       "Order not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Could not fetch order"})
-		}
-		return
-	}
-
-	if order.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"Status":      "error",
-			"Status code": "403",
-			"error":       "Access denied"})
-		return
-	}
-
-	var user models.User
-	if err := models.DB.First(&user, order.UserID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "error",
-			"Status code": "500",
-			"error":       "Could not fetch user information"})
-		return
-	}
-
-	var address models.Address
-	if err := models.DB.First(&address, order.AddressID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "error",
-			"Status code": "500",
-			"error":       "Could not fetch address information"})
-		return
-	}
-
-	fullAddress := fmt.Sprintf("%s, %s, %s, %s, %s, %s",
-		address.AddressLine1,
-		address.AddressLine2,
-		address.City,
-		address.State,
-		address.Zipcode,
-		address.Country)
-
-	var products []gin.H
-	var totalQuantity int
-	var totalDiscount, totalAmountWithoutDiscount float64
-
-	for _, item := range order.Items {
-		var product models.Product
-		if err := models.DB.Preload("Images", func(db *gorm.DB) *gorm.DB {
-			return db.Limit(1) // This will fetch only one image per product
-		}).First(&product, item.ProductID).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to fetch product",
-			})
-			return
-		}
-
-		var imageURL, imagePath string
-		if len(product.Images) > 0 {
-			imageURL = product.Images[0].ImageURL
-			imagePath = product.Images[0].FilePath
-		}
-
-		itemTotal := product.Price * float64(item.Quantity)
-		itemDiscount := itemTotal * product.Discount / 100
-
-		totalAmountWithoutDiscount += itemTotal
-		totalDiscount += itemDiscount
-
-		productInfo := gin.H{
-			"OrderItemID": item.ID,
-			"ID":          product.ID,
-			"Name":        product.Name,
-			"Price":       product.Price,
-			"Discount":    product.Discount,
-			"Quantity":    item.Quantity,
-			"ImageURL":    imageURL,
-			"ImagePath":   imagePath,
-		}
-		products = append(products, productInfo)
-		totalQuantity += item.Quantity
-	}
-	var payment models.Payment
-	if err := models.DB.Where("order_id = ?", order.PaymentID).First(&payment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Could not fetch payment information",
-		})
-		return
-	}
-
-	payStatus := ""
-
-	if payment.Status == "created" {
-
-		payStatus = "Pending"
-	}
-
-	//finalAmount := totalAmountWithoutDiscount - totalDiscount
-
-	response := struct {
-		OrderID         uint      `json:"order_id"`
-		Username        string    `json:"username"`
-		Email           string    `json:"email"`
-		Phone           string    `json:"phone"`
-		Address         string    `json:"address"`
-		TotalAmount     float64   `json:"total_amount"`
-		TotalDiscount   float64   `json:"total_discount"`
-		FinalAmount     float64   `json:"final_amount"`
-		PaymentMethod   string    `json:"payment_method"`
-		Status          string    `json:"status"`
-		CreatedAt       time.Time `json:"created_at"`
-		TotalQuantity   int       `json:"total_quantity"`
-		Offer_discount  float64   `json:"offer_discount"`
-		Coupon_discount float64   `json:"coupon_discount"`
-	}{
-		OrderID:         order.ID,
-		Username:        user.Name,
-		Email:           user.Email,
-		Phone:           address.AddressPhone,
-		Address:         fullAddress,
-		TotalAmount:     order.TotalAmount,
-		Offer_discount:  order.OfferDicount,
-		Coupon_discount: order.CouponDiscount,
-		TotalDiscount:   order.TotalDiscount,
-		FinalAmount:     order.FinalAmount,
-		PaymentMethod:   order.PaymentMethod,
-		Status:          order.Status,
-		CreatedAt:       order.CreatedAt,
-		TotalQuantity:   totalQuantity,
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":         "success",
-		"Status code":    "200",
-		"order":          response,
-		"Products":       products,
-		"Payment Status": payStatus,
-	})
-}
-
+// ..............................................................Get all orders..................................................
 func GetAllOrders(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"Status code": "401",
-			"error":       "User not authenticated"})
-		return
+
+		helpers.SendResponse(c, http.StatusUnauthorized, "user not Authenticated", nil)
+
 	}
 
 	var orders []models.Order
 
 	if err := models.DB.Where("user_id = ? AND status != ?", userID, "Canceled").Preload("Items").Order("created_at desc").Find(&orders).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Could not fetch orders"})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Could not fetch orders", nil)
 		return
 	}
 
 	var user models.User
 	if err := models.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Could not fetch user information"})
-		return
+		helpers.SendResponse(c, http.StatusUnauthorized, "Could not fetch user", nil)
 	}
 
 	type OrderItemResponse struct {
@@ -235,10 +63,7 @@ func GetAllOrders(c *gin.Context) {
 	for _, order := range orders {
 		var address models.Address
 		if err := models.DB.First(&address, order.AddressID).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":      "error",
-				"Status code": "500",
-				"error":       "Could not fetch address information"})
+			helpers.SendResponse(c, http.StatusUnauthorized, "Could not fetch address", nil)
 			return
 		}
 
@@ -262,10 +87,8 @@ func GetAllOrders(c *gin.Context) {
 			var product models.Product
 			if err := models.DB.Preload("Images", "id IN (SELECT MIN(id) FROM images WHERE product_id = ? GROUP BY product_id)", item.ProductID).
 				First(&product, item.ProductID).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"status":      "error",
-					"Status code": "500",
-					"error":       "Could not fetch product information"})
+				helpers.SendResponse(c, http.StatusUnauthorized, "Could not fetch product", nil)
+
 				return
 			}
 
@@ -310,21 +133,151 @@ func GetAllOrders(c *gin.Context) {
 			Items:         orderItems,
 		})
 	}
+	helpers.SendResponse(c, http.StatusUnauthorized, "", nil, gin.H{"orders": response})
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"Status code": "200",
-		"orders":      response,
-	})
 }
+
+// .......................................................order details........................................................
+func GetOrderDetails(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		helpers.SendResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
+		return
+	}
+
+	orderID := c.Param("order_id")
+
+	var order models.Order
+
+	if err := models.DB.Preload("Items").First(&order, orderID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			helpers.SendResponse(c, http.StatusNotFound, "Order not found", nil)
+
+		} else {
+			helpers.SendResponse(c, http.StatusNotFound, "Could not fetch order", nil)
+		}
+		return
+	}
+
+	if order.UserID != userID {
+		helpers.SendResponse(c, http.StatusUnauthorized, "You are not authorized to view this order", nil)
+	}
+
+	var user models.User
+	if err := models.DB.First(&user, order.UserID).Error; err != nil {
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch user", nil)
+		return
+	}
+
+	var address models.Address
+	if err := models.DB.First(&address, order.AddressID).Error; err != nil {
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch address", nil)
+		return
+	}
+
+	fullAddress := fmt.Sprintf("%s, %s, %s, %s, %s, %s",
+		address.AddressLine1,
+		address.AddressLine2,
+		address.City,
+		address.State,
+		address.Zipcode,
+		address.Country)
+
+	var products []gin.H
+	var totalQuantity int
+	var totalDiscount, totalAmountWithoutDiscount float64
+
+	for _, item := range order.Items {
+		var product models.Product
+		if err := models.DB.Preload("Images", func(db *gorm.DB) *gorm.DB {
+			return db.Limit(1) // This will fetch only one image per product
+		}).First(&product, item.ProductID).Error; err != nil {
+			helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch product", nil)
+			return
+		}
+
+		var imageURL, imagePath string
+		if len(product.Images) > 0 {
+			imageURL = product.Images[0].ImageURL
+			imagePath = product.Images[0].FilePath
+		}
+
+		itemTotal := product.Price * float64(item.Quantity)
+		itemDiscount := itemTotal * product.Discount / 100
+
+		totalAmountWithoutDiscount += itemTotal
+		totalDiscount += itemDiscount
+
+		productInfo := gin.H{
+			"OrderItemID": item.ID,
+			"ID":          product.ID,
+			"Name":        product.Name,
+			"Price":       product.Price,
+			"Discount":    product.Discount,
+			"Quantity":    item.Quantity,
+			"ImageURL":    imageURL,
+			"ImagePath":   imagePath,
+		}
+		products = append(products, productInfo)
+		totalQuantity += item.Quantity
+	}
+	var payment models.Payment
+	if err := models.DB.Where("order_id = ?", order.PaymentID).First(&payment).Error; err != nil {
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch payment", nil)
+		return
+	}
+
+	payStatus := ""
+
+	if payment.Status == "created" {
+
+		payStatus = "Pending"
+	}
+
+	//finalAmount := totalAmountWithoutDiscount - totalDiscount
+
+	response := struct {
+		OrderID         uint      `json:"order_id"`
+		Username        string    `json:"username"`
+		Email           string    `json:"email"`
+		Phone           string    `json:"phone"`
+		Address         string    `json:"address"`
+		TotalAmount     float64   `json:"total_amount"`
+		TotalDiscount   float64   `json:"total_discount"`
+		FinalAmount     float64   `json:"final_amount"`
+		PaymentMethod   string    `json:"payment_method"`
+		Status          string    `json:"status"`
+		CreatedAt       time.Time `json:"created_at"`
+		TotalQuantity   int       `json:"total_quantity"`
+		Offer_discount  float64   `json:"offer_discount"`
+		Coupon_discount float64   `json:"coupon_discount"`
+	}{
+		OrderID:         order.ID,
+		Username:        user.Name,
+		Email:           user.Email,
+		Phone:           address.AddressPhone,
+		Address:         fullAddress,
+		TotalAmount:     order.TotalAmount,
+		Offer_discount:  order.OfferDicount,
+		Coupon_discount: order.CouponDiscount,
+		TotalDiscount:   order.TotalDiscount,
+		FinalAmount:     order.FinalAmount,
+		PaymentMethod:   order.PaymentMethod,
+		Status:          order.Status,
+		CreatedAt:       order.CreatedAt,
+		TotalQuantity:   totalQuantity,
+	}
+
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"order": response, "Products": products, "Payment Status": payStatus})
+
+}
+
+//....................................................................Cancel the order.............................................
 
 func CancelOrder(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"Status code": "401",
-			"error":       "User not authenticated"})
+		helpers.SendResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
 		return
 	}
 
@@ -335,10 +288,7 @@ func CancelOrder(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"Status code": "400",
-			"error":       "Invalid input"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid request", nil)
 		return
 	}
 
@@ -363,12 +313,7 @@ func CancelOrder(c *gin.Context) {
 
 		if err := tx.Where("user_id=? AND order_id =? ", userID, orderID).Delete(couponUsage).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to delete coupon usage: " + err.Error(),
-			})
-
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to delete coupon usage", nil)
 			return err
 
 		}
@@ -377,6 +322,8 @@ func CancelOrder(c *gin.Context) {
 		for _, item := range order.Items {
 			if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
 				UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
+				tx.Rollback()
+				helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update product stock", nil)
 				return err
 			}
 		}
@@ -385,18 +332,10 @@ func CancelOrder(c *gin.Context) {
 	})
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Failed to cancel order: " + err.Error()})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to cancel order", nil)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"Status":      "Success",
-		"Status code": "200",
-		"message":     "Order canceled successfully",
-	})
+	helpers.SendResponse(c, http.StatusOK, "Order canceled successfully", nil)
 }
 
 //........................................................................................................................../
@@ -404,10 +343,7 @@ func CancelOrder(c *gin.Context) {
 func ReturnOrder(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"Status code": "401",
-			"error":       "User not authenticated"})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
 	}
 
@@ -418,10 +354,8 @@ func ReturnOrder(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"Status code": "400",
-			"error":       "Invalid input"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid request", nil)
+
 		return
 	}
 
@@ -446,10 +380,7 @@ func ReturnOrder(c *gin.Context) {
 	})
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Failed to cancel order: " + err.Error()})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to  Cancel order", nil)
 		return
 	}
 
@@ -469,29 +400,21 @@ func ReturnOrder(c *gin.Context) {
 						Balance: returnAmount,
 					}
 					if err := models.DB.Create(&newWallet).Error; err != nil {
+						helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create wallet", nil)
 
-						c.JSON(http.StatusInternalServerError, gin.H{
-							"status":  "error",
-							"message": "Failed to create wallet: " + err.Error(),
-						})
 						return
 					}
 				} else {
-					// Some other error occurred
 
-					c.JSON(http.StatusInternalServerError, gin.H{
-						"status":  "error",
-						"message": "Failed to fetch wallet: " + err.Error(),
-					})
+					helpers.SendResponse(c, http.StatusInternalServerError, "Failed to get wallet", nil)
+
 					return
 				}
 			} else {
 
 				if err := models.DB.Model(&wallet).Where("user_ID = ?", userID).Update("balance", gorm.Expr("balance + ?", returnAmount)).Error; err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{
-						"status":  "error",
-						"message": "Failed to update wallet balance: " + err.Error(),
-					})
+					helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update wallet", nil)
+
 					return
 				}
 			}
@@ -512,32 +435,22 @@ func ReturnOrder(c *gin.Context) {
 	}
 
 	//.........................................................................................................
+	helpers.SendResponse(c, http.StatusOK, "Order return requset  successfully sent", nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"Status":      "Success",
-		"Status code": "200",
-		"message":     "Order return requset  successfully sent",
-	})
 }
 
-//..............................................................................................................................
+//...............................................Cansceled order Page............................................................
 
 func CanceledOrders(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"Status":      "Error",
-			"Status code": "401",
-			"error":       "User not authenticated"})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
 	}
 
 	var orders []models.Order
 	if err := models.DB.Where("user_id = ? AND status = ?", userID, "Canceled").Preload("Items").Order("created_at desc").Find(&orders).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "Error",
-			"Status code": "500",
-			"error":       "Could not fetch canceled orders"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to get orders", nil)
 		return
 	}
 
@@ -570,10 +483,7 @@ func CanceledOrders(c *gin.Context) {
 			if err := models.DB.Preload("Images", func(db *gorm.DB) *gorm.DB {
 				return db.Limit(1) // This will fetch only one image per product
 			}).First(&product, item.ProductID).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"Status":      "Error",
-					"Status code": "500",
-					"error":       "Could not fetch product details"})
+				helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch product details", nil)
 				return
 			}
 
@@ -605,32 +515,23 @@ func CanceledOrders(c *gin.Context) {
 			Products:           products,
 		})
 	}
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"data": response})
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"Status code": "200",
-		"data":        response,
-	})
 }
 
+// ......................................................Update Cancel order item..............................................
 func UpdateCancelOrderItem(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"Status code": "401",
-			"error":       "User not authenticated",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
+
 		return
 	}
 
 	orderID, err := strconv.ParseUint(c.Param("order_id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"Status code": "400",
-			"error":       "Invalid order ID",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid order ID", nil)
+
 		return
 	}
 
@@ -641,28 +542,17 @@ func UpdateCancelOrderItem(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"Status code": "400",
-			"error":       "Invalid input: " + err.Error(),
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid input", nil)
 		return
 	}
 
 	var couponUsage models.CouponUsage
 	if err := models.DB.Where("order_id = ?", orderID).First(&couponUsage).Error; err == nil {
-		c.JSON(http.StatusForbidden, gin.H{
-			"status":      "error",
-			"Status code": "403",
-			"error":       "Cannot update individual items for orders with coupons. Please cancel the entire order instead.",
-		})
+		helpers.SendResponse(c, http.StatusForbidden, "Cannot update individual items for orders with coupons. Please cancel the entire order instead.", nil)
+
 		return
 	} else if err != gorm.ErrRecordNotFound {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Failed to check coupon usage: " + err.Error(),
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to check coupon usage", nil)
 		return
 	}
 
@@ -755,38 +645,26 @@ func UpdateCancelOrderItem(c *gin.Context) {
 	})
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Failed to update order item: " + err.Error(),
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update order item: ", nil)
 		return
 	}
+	helpers.SendResponse(c, http.StatusOK, "Order item updated successfully", nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"Status":      "Success",
-		"Status code": "200",
-		"message":     "Order item updated successfully",
-	})
 }
 
+// .......................................................Cancel order Item..............................................
 func CancelOrderItem(c *gin.Context) {
 
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"Status code": "401",
-			"error":       "User not authenticated"})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
 	}
 
 	orderID, err := strconv.ParseUint(c.Param("order_id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"Status code": "400",
-			"error":       "Invalid order ID"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid order ID", nil)
+
 		return
 	}
 
@@ -796,10 +674,8 @@ func CancelOrderItem(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"Status code": "400",
-			"error":       "Invalid input: " + err.Error()})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid request body", nil)
+
 		return
 	}
 	var order models.Order
@@ -807,17 +683,13 @@ func CancelOrderItem(c *gin.Context) {
 
 	if err := models.DB.Where("order_id = ?", orderID).First(&couponUsage).Error; err == nil {
 
-		c.JSON(http.StatusForbidden, gin.H{
-			"status":      "error",
-			"Status code": "403",
-			"error":       "Cannot cancel individual items for orders with coupons. Please cancel the entire order instead."})
+		helpers.SendResponse(c, http.StatusForbidden, "Cannot cancel individual items for orders with coupons. Please cancel the entire order instead.", nil)
+
 		return
 	} else if err != gorm.ErrRecordNotFound {
 
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Failed to check coupon usage: " + err.Error()})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Faild to check coupon usage", nil)
+
 		return
 	}
 
@@ -900,16 +772,10 @@ func CancelOrderItem(c *gin.Context) {
 	})
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Failed to cancel order item: " + err.Error()})
+		helpers.SendResponse(c, http.StatusBadRequest, "Failed to cancel order item: ", nil)
+
 		return
 	}
+	helpers.SendResponse(c, http.StatusOK, "Order item canceled successfully", nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"Status":      "Success",
-		"Status code": "200",
-		"message":     "Order item canceled successfully",
-	})
 }

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"mountgear/helpers"
 	"mountgear/models"
 	"mountgear/utils"
 	"net/http"
@@ -11,93 +12,62 @@ import (
 	"gorm.io/gorm"
 )
 
+// ................................................................Userprofile page..............................................
 func GetUserProfile(c *gin.Context) {
 	userID, exists := c.Get("userID")
 
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":       "unauthorized",
-			"Status code": "401",
-			"message":     "need  to signup",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "unauthorized", nil)
 		return
 	}
 
 	var user models.User
-	var wallet models.Wallet
-	walletbalance := wallet.Balance
+	var wallets models.Wallet
 
-	if err := models.DB.Preload("Addresses").First(&user, userID).Error; err != nil { // change to function
-		c.JSON(http.StatusNotFound, gin.H{
-			"Status":      "error",
-			"Status code": "404",
-			"error":       "User not found"})
+	if err := models.DB.Where("user_id=?", userID).First(&wallets).Error; err != nil { // change to function
+		helpers.SendResponse(c, http.StatusNotFound, "User not found", nil)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"ID":             user.ID,
-		"Name":           user.Name,
-		"Email":          user.Email,
-		"Phone":          user.Phone,
-		"Addresses":      user.Addresses,
-		"wallet Balance": walletbalance,
-	})
+	if err := models.DB.Preload("Addresses").First(&user, userID).Error; err != nil { // change to function
+		helpers.SendResponse(c, http.StatusNotFound, "User not found", nil)
 
-	// c.JSON(http.StatusOK, scripts.StatusResponse(http.StatusOK, "success", user.Addresses))
+		return
+	}
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"ID": user.ID, "Name": user.Name, "Email": user.Email, "Phone": user.Phone, "wallet Balance": wallets.Balance})
 
 }
 
+// ................................................................Edit userprofile page............................................
 func GetEditProfile(c *gin.Context) {
 
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"Status":      "error",
-			"Status code": "401",
-			"error":       "unauthorized",
-			"message":     "need  to signup",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "unauthorized", nil)
 		return
 	}
 	var user models.User
 
 	if err := models.DB.First(&user, userID).Error; err != nil { // change to function
-		c.JSON(http.StatusNotFound, gin.H{
-			"Status":      "error",
-			"Status code": "404",
-			"error":       "User not found"})
+		helpers.SendResponse(c, http.StatusNotFound, "User not found", nil)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"Status":      "Success",
-		"Status code": "200",
-		"Name":        user.Name,
-		"Phone":       user.Phone,
-	})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"Name": user.Name, "Phone": user.Phone})
 
 }
 
+// .........................................................Edit user profile...............................................
 func EditProfile(c *gin.Context) {
 
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"Status":      "error",
-			"Status code": "401",
-			"error":       "unauthorized",
-			"message":     "need  to signup",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "unauthorized", nil)
 		return
 	}
 	var user models.User
 
 	if err := models.DB.First(&user, userID).Error; err != nil { // change to function
-		c.JSON(http.StatusNotFound, gin.H{
-			"Status":      "error",
-			"Status code": "404",
-			"error":       "User not found"})
+		helpers.SendResponse(c, http.StatusNotFound, "User not found", nil)
 		return
 	}
 	user.Name = c.PostForm("name")
@@ -105,85 +75,53 @@ func EditProfile(c *gin.Context) {
 
 	if !utils.ValidPhoneNumber(user.Phone) {
 
-		c.JSON(http.StatusBadRequest, gin.H{
-			"Status":      "error",
-			"Status code": "400",
-			"message":     "Enter the a valid Number",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Enter the a valid Number", nil)
+
 		return
 	}
 
 	if err := models.DB.Save(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "error",
-			"Status code": "500",
-			"error":       "Failed to update user profile"}) /// function add
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update user profile", nil)
+
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"Status":      "Success",
-		"Status code": "200",
-		"message":     "profile successfully Updated",
-
-		"users": user.Name,
-		"phone": user.Phone,
-	})
-
+	helpers.SendResponse(c, http.StatusOK, "profile successfully Updated", nil, gin.H{"users": user.Name, "phone": user.Phone})
 }
+
+//.....................................................Change password page in profile....................................................
 
 func GetChangePassword(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"Status":      "error",
-			"Status code": "401",
-			"error":       "unauthorized",
-			"message":     "need  to signup",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "unauthorized", nil)
 		return
 	}
 	var user models.User
 
 	if err := models.DB.First(&user, userID).Error; err != nil { // change to function
-		c.JSON(http.StatusNotFound, gin.H{
-			"Status":      "error",
-			"Status code": "404",
-			"error":       "User not found"})
+		helpers.SendResponse(c, http.StatusNotFound, "User not found", nil)
+
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-
-		"Status":      "Success",
-		"Status code": "200",
-
-		"Name":  user.Name,
-		"Phone": user.Phone,
-		"Email": user.Email,
-	})
+	helpers.SendResponse(c, http.StatusNotFound, "", nil, gin.H{"Name": user.Name, "Phone": user.Phone, "Email": user.Email})
 
 }
 
+// ..........................................................change password.......................................................
 func ChangePassword(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"Status":      "error",
-			"Status code": "401",
-			"error":       "unauthorized",
-			"message":     "need to signup",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "unauthorized", nil)
+
 		return
 	}
 
 	var user models.User
 
 	if err := models.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"Status":      "error",
-			"Status code": "404",
-			"error":       "User not found"})
+		helpers.SendResponse(c, http.StatusNotFound, "User not found", nil)
 		return
 	}
 
@@ -192,131 +130,88 @@ func ChangePassword(c *gin.Context) {
 	confirmPassword := c.PostForm("confirmPassword")
 
 	if newPassword != confirmPassword {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"Status":      "error",
-			"Status code": "400",
-			"error":       "Password and confirm password do not match"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Passwords do not match", nil)
 		return
 	}
 
 	if !utils.CheckPasswordComplexity(newPassword) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status code": "400",
-			"message":     "Password must be at least 4 characters long and include a mix of uppercase, lowercase, numbers, and special characters",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Password is not strong enough", nil)
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(currentPassword)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"status code": "401",
-			"message":     "Invalid current password. Please enter a valid password",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid current password. Please enter a valid password", nil)
+
 		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status code": "500",
-			"error":       "Failed to hash new password"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to hash password", nil)
+
 		return
 	}
 
 	result := models.DB.Model(&user).Update("password", string(hashedPassword))
 	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status code": "500",
-			"error":       "Failed to update password"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update password", nil)
+
 		return
 	}
+	helpers.SendResponse(c, http.StatusOK, "Password updated successfully", nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"status code": "200",
-		"message":     "Password updated successfully",
-	})
 }
+
+// ............................................................Get addrress page..............................................
 func GetAddAddress(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":       "unauthorized",
-			"status":      "error",
-			"status code": "401",
-			"message":     "need to signup",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
+
 		return
 	}
 
 	var addresses []models.Address
 
 	if err := models.DB.Where("user_id = ?", userID).Find(&addresses).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status code": "500",
-			"error":       "Failed to retrieve addresses"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to get addresses", nil)
+
 		return
 	}
 
 	if len(addresses) == 0 {
-		c.JSON(http.StatusOK, gin.H{
-			"status":      "success",
-			"status code": "200",
-
-			"message": "No addresses found for this user. Ready to add address.",
-		})
+		helpers.SendResponse(c, http.StatusOK, "Addresses retrieved successfully", nil)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"status code": "200",
-		"addresses":   addresses,
-		"message":     "Addresses retrieved successfully",
-	})
+	helpers.SendResponse(c, http.StatusOK, "No addresses found", nil, gin.H{"addresses": addresses})
 
 }
 
+// .....................................................................Add Address.............................................
 func AddAddress(c *gin.Context) {
 
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":       "unauthorized",
-			"status":      "error",
-			"status code": "401",
-			"message":     "need  to signup",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
+
 		return
 	}
 	var addressCount int64
 	if err := models.DB.Model(&models.Address{}).Where("user_id = ?", userID).Count(&addressCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status code": "500",
-			"error":       "Failed to check address count"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to get address count", nil)
 		return
 	}
 
 	// If the user already has 3 addresses, return an error
 	if addressCount >= 3 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status code": "400",
-			"error":       "You can only add up to 3 addresses"})
+		helpers.SendResponse(c, http.StatusBadRequest, "You can only have 3 addresses", nil)
+
 		return
 	}
 	var input models.Address
 	if err := c.ShouldBind(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status code": "400",
-			"error":       err.Error()})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid request body", nil)
+
 		return
 	}
 
@@ -335,37 +230,24 @@ func AddAddress(c *gin.Context) {
 	// }
 
 	if input.AddressLine1 == "" || input.City == "" || input.State == "" || input.Zipcode == "" || input.Country == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status code": "400",
-			"error":       "Required fields are missing"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Please fill all the fields", nil)
 		return
 	}
 	if err := models.CreateRecord(models.DB, &input, &input); err != nil { // chage to (...)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status code": "500",
-			"error":       "Failed to add address"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create address", nil)
+
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"Status":      "Success",
-		"Status Code": "200",
-		"message":     "Address added successfully",
-	})
-
+	helpers.SendResponse(c, http.StatusOK, "Address added successfully", nil)
 }
 
+// ...........................................................edit address page,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 func GetEditAddress(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"status code": "401",
-			"error":       "Unauthorized",
-			"message":     "User not authenticated",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
+
 		return
 	}
 
@@ -375,43 +257,28 @@ func GetEditAddress(c *gin.Context) {
 	// Convert addressID to uint
 	id, err := strconv.ParseUint(addressID, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status code": "400",
-			"error":       "Invalid address ID"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid address ID", nil)
+
 		return
 	}
 
 	// Find the address
 	var address models.Address
 	if err := models.DB.Where("id = ? AND user_id = ?", id, userID).First(&address).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":      "error",
-			"status code": "404",
-			"error":       "Address not found"})
+		helpers.SendResponse(c, http.StatusNotFound, "Address not found", nil)
+
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-
-		"Status":      "Success",
-		"Status Code": "200",
-
-		"message": "Address found successfully",
-		"address": address,
-	})
-
+	helpers.SendResponse(c, http.StatusOK, "Address found successfully", nil, gin.H{"address": address})
 }
 
+// ......................................................edit address.........................................................
 func EditAddress(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"status code": "401",
-			"error":       "Unauthorized",
-			"message":     "User not authenticated",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
+
 		return
 	}
 
@@ -421,25 +288,19 @@ func EditAddress(c *gin.Context) {
 	// Convert addressID to uint
 	id, err := strconv.ParseUint(addressID, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status code": "400",
-			"error":       "Invalid address ID"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid address ID", nil)
+
 		return
 	}
 
 	var address models.Address
 	if err := models.DB.Where("id = ? AND user_id = ?", id, userID).First(&address).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"status":      "error",
-				"status code": "404",
-				"error":       "Address not found or doesn't belong to the user"})
+			helpers.SendResponse(c, http.StatusNotFound, "Address not found", nil)
+
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":      "error",
-				"status code": "500",
-				"error":       "Failed to find address"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to find address", nil)
+
 		}
 		return
 	}
@@ -454,30 +315,19 @@ func EditAddress(c *gin.Context) {
 
 	// Save the updated address
 	if err := models.DB.Save(&address).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status code": "500",
-			"error":       "Failed to update address"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update address", nil)
+
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"status code": "200",
-		"message":     "Address updated successfully",
-		"address":     address,
-	})
+	helpers.SendResponse(c, http.StatusOK, "Address updated successfully", nil, gin.H{"address": address})
 }
 
 func DeleteAddress(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"status code": "401",
-			"error":       "Unauthorized",
-			"message":     "User not authenticated",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
+
 		return
 	}
 
@@ -487,10 +337,7 @@ func DeleteAddress(c *gin.Context) {
 	// Convert addressID to uint
 	id, err := strconv.ParseUint(addressID, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status code": "400",
-			"error":       "Invalid address ID"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid address ID", nil)
 		return
 	}
 
@@ -498,31 +345,21 @@ func DeleteAddress(c *gin.Context) {
 	var address models.Address
 	if err := models.DB.Where("id = ? AND user_id = ?", id, userID).First(&address).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"status":      "error",
-				"status code": "404",
-				"error":       "Address not found or doesn't belong to the user"})
+			helpers.SendResponse(c, http.StatusNotFound, "Address not found", nil)
+
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":      "error",
-				"status code": "500",
-				"error":       "Failed to find address"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to find address", nil)
+
 		}
 		return
 	}
 
 	// Delete the address
 	if err := models.DB.Delete(&address).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status code": "500",
-			"error":       "Failed to delete address"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to delete address", nil)
+
 		return
 	}
+	helpers.SendResponse(c, http.StatusOK, "Address deleted successfully", nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "Success",
-		"status code": "200",
-		"message":     "Address deleted successfully",
-	})
 }

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// ...............................................................Shop page.............................................................
 func GetShopPage(ctx *gin.Context) {
 	var products []models.Product
 	var totalCount int64
@@ -94,62 +96,44 @@ func GetShopPage(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
 		return
 	}
+	helpers.SendResponse(ctx, http.StatusOK, "", nil, gin.H{"products": products, "total_count": totalCount})
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"Status":      "success",
-		"Status code": "200",
+	// "page":        page,
+	// "per_page":    perPage,
 
-		"products":    products,
-		"total_count": totalCount,
-		// "page":        page,
-		// "per_page":    perPage,
-	})
 }
 
+// .....................................................Product Deatils..........................................................
 func GetProductDetails(ctx *gin.Context) {
 	id := ctx.Param("id")
 	var product models.Product
 
 	if err := models.GetRecordByID(models.DB.Preload("Images"), &product, id); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "error",
-			"Status code": "500",
-			"error":       err.Error()})
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "not fetch images", nil)
 
 	}
+	helpers.SendResponse(ctx, http.StatusOK, "", nil, gin.H{"Product": product})
 
-	ctx.JSON(http.StatusOK, gin.H{
-
-		"Product": product})
 }
 
-func ProductSerch(c *gin.Context) { // change name @@@@
+func ProductSerch(c *gin.Context) {
 
 	query := c.Query("query")
 
 	var products []models.Product
 	if err := models.DB.Where("LOWER(name) LIKE LOWER(?)", "%"+query+"%").Find(&products).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "error",
-			"Status code": "500",
-			"error":       "Could not search users"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "could not search users", nil)
 		return
 	}
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"products": products})
 
-	c.JSON(http.StatusOK, gin.H{
-		"Status":      "success",
-		"Status code": "200",
-		"products":    products})
 }
 
 func AddToCart(c *gin.Context) {
 
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"Status":      "error",
-			"Status code": "401",
-			"error":       "User not authenticated"})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
 	}
 
@@ -158,36 +142,27 @@ func AddToCart(c *gin.Context) {
 		Quantity  int  `json:"quantity" binding:"required,min=1"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-
-			"error": err.Error()})
+		helpers.SendResponse(c, http.StatusBadRequest, "struct not bind", nil)
 
 		return
 	}
 	// Find the product
 	var product models.Product
 	if err := models.DB.First(&product, input.ProductID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"Status":      "Error",
-			"Status code": "404",
-			"error":       "Product not found"})
+		helpers.SendResponse(c, http.StatusNotFound, "product not found", nil)
+
 		return
 	}
 	if !product.IsActive {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"Status":      "Error",
-			"Status code": "400",
-			"error":       "Product is not active",
-		})
+		helpers.SendResponse(c, http.StatusNotFound, "product not found", nil)
+
 		return
 	}
 	// Find or create cart for the user
 	var cart models.Cart
 	if err := models.DB.FirstOrCreate(&cart, models.Cart{UserID: userID.(uint)}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "error",
-			"Status code": "500",
-			"error":       "Failed to get or create cart"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "could not find or create cart", nil)
+
 		return
 	}
 
@@ -198,18 +173,13 @@ func AddToCart(c *gin.Context) {
 	if result.Error == gorm.ErrRecordNotFound {
 		// Product not in cart, add new cart item
 		if input.Quantity > 5 {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"Status":      "error",
-				"Status code": "400",
-				"error":       "Cannot add more than 5 quantities of a product"})
+			helpers.SendResponse(c, http.StatusBadRequest, "Cannot have more than 5 quantities of a product in cart", nil)
 			return
 		}
 
 		if int32(input.Quantity) > product.Stock {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"Status":      "error",
-				"Status code": "400",
-				"error":       "Not enough stock"})
+			helpers.SendResponse(c, http.StatusBadRequest, "Not enough stock", nil)
+
 			return
 		}
 
@@ -220,51 +190,37 @@ func AddToCart(c *gin.Context) {
 		}
 
 		if err := models.DB.Create(&cartItem).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to add item to cart"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "could not add product to cart", nil)
 			return
 		}
 	} else if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "error",
-			"Status code": "500",
-			"error":       "Failed to check cart"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to check cart", nil)
+
 		return
 	} else {
 		// Product already in cart, update quantity
 		newQuantity := cartItem.Quantity + input.Quantity
 
 		if newQuantity > 5 {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"Status":      "error",
-				"Status code": "400",
-				"error":       "Cannot have more than 5 quantities of a product in cart"})
+			helpers.SendResponse(c, http.StatusBadRequest, "Cannot have more than 5 quantities of a product in cart", nil)
+
 			return
 		}
 
 		if int32(newQuantity) > product.Stock {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"Status":      "error",
-				"Status code": "400",
-				"error":       "Not enough stock"})
+			helpers.SendResponse(c, http.StatusBadRequest, "Not enough stock", nil)
+
 			return
 		}
 
 		cartItem.Quantity = newQuantity
 
 		if err := models.DB.Save(&cartItem).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to update cart item"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update cart item", nil)
+
 			return
 		}
 	}
+	helpers.SendResponse(c, http.StatusOK, "Product added to cart successfully", nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"Status":      "Success",
-		"Status code": "200",
-		"message":     "Product added to cart successfully"})
 }

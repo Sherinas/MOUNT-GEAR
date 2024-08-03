@@ -186,7 +186,7 @@ func generateRandomNumber() string { // not used
 	}
 	return string(randomBytes)
 }
-func generateRandomCode() string {
+func GenerateRandomCode() string {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	codeLength := 8
 

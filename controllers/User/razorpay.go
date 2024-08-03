@@ -133,6 +133,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
 	"os"
@@ -144,7 +145,8 @@ func RazorpayPayment(c *gin.Context) {
 	var response map[string]string
 	if err := c.ShouldBindJSON(&response); err != nil {
 		fmt.Println("Error binding JSON:", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		helpers.SendResponse(c, http.StatusBadRequest, "invalid request", nil)
+
 		return
 	}
 
@@ -160,26 +162,25 @@ func RazorpayPayment(c *gin.Context) {
 		if err := models.DB.Model(&models.Order{}).
 			Where("payment_id = ?", response["order_id"]).
 			Update("payment_status", false).Error; err != nil {
-			fmt.Println("Error updating payment status:", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update payment status"})
+
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update payment status", nil)
 			return
 		}
 
 		if err := models.DB.Model(&models.Payment{}).Where("order_id = ?", response["order_id"]).Updates(&payment).Error; err != nil {
 			fmt.Println("Error updating payment status:", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update payment status"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update payment status", nil)
+
 			return
 		}
+		helpers.SendResponse(c, http.StatusOK, "Payment failure response received successfully", nil, gin.H{"order_id": response["order_id"]})
 
-		//.................................................................................................
-		c.JSON(http.StatusOK, gin.H{"message": "Payment failure response received successfully", "order_id": response["order_id"]})
 		return
 	}
 
 	err := RazorPaymentVerification(response["razorpay_signature"], response["razorpay_order_id"], response["razorpay_payment_id"])
 	if err != nil {
-		fmt.Println("Payment verification failed:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Payment verification failed"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Payment verification Failed", nil)
 		return
 	}
 
@@ -192,11 +193,12 @@ func RazorpayPayment(c *gin.Context) {
 	log.Printf("%v", payment.TransactionID)
 	if err := models.DB.Model(&models.Payment{}).Where("order_id = ?", response["razorpay_order_id"]).Updates(&payment).Error; err != nil {
 		fmt.Println("Error updating payment status:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update payment status"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update payment status", nil)
+
 		return
 	}
+	helpers.SendResponse(c, http.StatusOK, "Payment response received successfully", nil)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Payment response received successfully"})
 }
 
 func RazorPaymentVerification(sign, orderId, paymentId string) error {

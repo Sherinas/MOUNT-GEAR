@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
 	"strconv"
@@ -10,32 +11,26 @@ import (
 	"gorm.io/gorm"
 )
 
+//.....................................................List coupons..................................................
+
 func ListCoupons(c *gin.Context) {
 	var coupon []models.Coupon
 
 	if err := models.FetchData(models.DB, &coupon); err != nil {
-		c.JSON(http.StatusOK, gin.H{
+		helpers.SendResponse(c, http.StatusNotFound, "Not find coupon data", nil)
 
-			"status":      http.StatusNotFound,
-			"Status code": "200",
-			"message":     err.Error(),
-		})
 		return
 
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-
-		"Status ":     "Success",
-		"Status code": "200",
-		"message":     coupon,
-	})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"coupons": coupon})
 
 }
 
 func GetNewCouponForm(c *gin.Context) {
 
 }
+
+// ...................................................................Create coupons..................................
 func CreateCoupon(c *gin.Context) {
 	var coupon models.Coupon
 
@@ -45,121 +40,79 @@ func CreateCoupon(c *gin.Context) {
 	validFrom := c.PostForm("validFrom")
 	validTo := c.PostForm("validTo")
 
-	discount, err := strconv.ParseFloat(discountStr, 64)
-	if err != nil || discount <= 0 || discount > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid discount percentage",
-		})
+	discount, err := strconv.ParseFloat(discountStr, 64) //  string data change to float value
+
+	if err != nil || discount <= 0 || discount > 100 { //discount validate
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid discount", nil)
 		return
 	}
 	coupon.Discount = discount
 
-	startDate, err := time.Parse("2006-01-02", validFrom)
+	startDate, err := time.Parse("2006-01-02", validFrom) //change to time
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid start date format",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid start date format", nil)
 		return
 	}
 	coupon.ValidFrom = startDate
 
 	endDate, err := time.Parse("2006-01-02", validTo)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid end date format",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid end date format", nil)
 		return
 	}
 	coupon.ValidTo = endDate
 
 	if endDate.Before(startDate) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "End date must be after start date",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "End date must be after start date", nil)
 		return
 	}
 
-	if models.CheckExists(models.DB, &models.Coupon{}, "LOWER(name) = LOWER(?)", coupon.Code) {
-		c.JSON(http.StatusConflict, gin.H{
-			"status": "error",
-			"error":  "Coupon with this name already exists",
-		})
+	if models.CheckExists(models.DB, &models.Coupon{}, "LOWER(name) = LOWER(?)", coupon.Code) { // copupen name checking
+		helpers.SendResponse(c, http.StatusBadRequest, "Coupon with this code already exists", nil)
+
 		return
 	}
 
-	if models.CheckExists(models.DB, &models.Coupon{}, "code = ?", coupon.Code) {
-		c.JSON(http.StatusConflict, gin.H{
-			"status": "error",
-			"error":  "Coupon with this code already exists",
-		})
+	if models.CheckExists(models.DB, &models.Coupon{}, "code = ?", coupon.Code) { //coupon code checking
+		helpers.SendResponse(c, http.StatusBadRequest, "Coupon with this code already exists", nil)
 		return
 	}
 
 	if err := models.CreateRecord(models.DB, &coupon, &coupon); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
-			"error":  "Failed to add coupon",
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create coupon", nil)
 		return
 	}
+	helpers.SendResponse(c, http.StatusOK, "Coupon added successfully", nil, gin.H{"coupon": coupon})
 
-	c.JSON(http.StatusCreated, gin.H{
-		"status":  "success",
-		"message": "Coupon added successfully",
-		"coupon":  coupon,
-	})
 }
 
+// ................................................Delete coupon.................................................
 func DeleteCoupon(c *gin.Context) {
 	var coupon models.Coupon
 	id := c.Param("id")
 
 	couponID, err := strconv.ParseUint(id, 10, 32)
+
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid coupon ID",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid coupon id", nil)
 		return
 	}
 
 	if err := models.DB.First(&coupon, couponID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"status":     "error",
-				"Erroe code": "404",
+			helpers.SendResponse(c, http.StatusNotFound, "Coupon not found", nil)
 
-				"error": "Coupon not found",
-			})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status": "error",
-				"Status": "500",
-				"error":  "Failed to retrieve coupon",
-			})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to retrieve coupon", nil)
 		}
 		return
 	}
 
 	if err := models.DB.Delete(&coupon).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
-			"Status": "500",
-
-			"error": "Failed to delete coupon",
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to delete coupon", nil)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":     "success",
-		"Satus code": "200",
-
-		"message": "Coupon deleted successfully",
-	})
+	helpers.SendResponse(c, http.StatusOK, "Coupon deleted successfully", nil)
 
 }

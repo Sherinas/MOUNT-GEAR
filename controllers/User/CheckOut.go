@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mountgear/helpers"
 	"mountgear/models"
 	"mountgear/utils"
 	"net/http"
@@ -19,15 +20,12 @@ import (
 // var TempEmail = make(map[string]string)
 // var TempQty = make(map[string]int)
 
+//.................................................checkout page..............................................
+
 func GetCheckOut(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-
-			"error":       "Unauthorized",
-			"Status code": "401",
-			"message":     "User not authenticated",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "User not Authenticated", nil)
 		return
 	}
 
@@ -37,20 +35,12 @@ func GetCheckOut(c *gin.Context) {
 	var wallet models.Wallet
 
 	if err := models.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"Status":      "error",
-			"Status code": "401",
-			"error":       "Unauthorized",
-			"message":     "User not found",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Error fetching user", nil)
 		return
 	}
 
 	if err := models.DB.Where("user_id = ?", userID).Find(&addresses).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"Status":      "error",
-			"Status code": "404",
-			"error":       "Addresses not found"})
+		helpers.SendResponse(c, http.StatusNotFound, "Error fetching addresses", nil)
 		return
 	}
 
@@ -58,20 +48,17 @@ func GetCheckOut(c *gin.Context) {
 		Preload("CartItems").Preload("CartItems.Product").
 		First(&cart).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{
-				"Status":      "error",
-				"Status code": "404",
-				"error":       "Cart not found for this user"})
+			helpers.SendResponse(c, http.StatusNotFound, "Cart not found", nil)
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Unable to fetch user cart: " + err.Error()})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Error fetching cart", nil)
+
 		}
 		return
 	}
 
-	walletAmount := wallet.Balance
+	if err := models.DB.Where("user_id=?", userID).First(&wallet).Error; err != nil {
+		helpers.SendResponse(c, http.StatusNotFound, "Wallet not found", nil)
+	}
 
 	var addressResponse []gin.H
 	for _, addr := range addresses {
@@ -107,38 +94,22 @@ func GetCheckOut(c *gin.Context) {
 	// TempEmail["email"] = user.Email
 
 	// Prepare final response
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "Success",
-		"status code": "200",
-		"user": gin.H{
-			"name":           user.Name,
-			"email":          user.Email,
-			"wallet Balance": walletAmount,
-			//"phone": user.Phone,
-		},
-		"addresses":   addressResponse,
-		"cart_items":  cartItemsResponse,
-		"grand_total": totalPrice,
-	})
+
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"user": gin.H{"name": user.Name, "email": user.Email, "wallet Balance": wallet.Balance}, "addresses": addressResponse, "cart_items": cartItemsResponse, "grand_total": totalPrice})
+
 }
 
 // did not use
 func CheckOutEditAddress(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "Error",
-			"status code": "401",
-			"error":       "User not authenticated"})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
 	}
 
 	addressID, err := strconv.Atoi(c.Param("addressID"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "Error",
-			"status code": "400",
-			"error":       "Invalid address ID"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid address ID", nil)
 		return
 	}
 
@@ -155,10 +126,7 @@ func CheckOutEditAddress(c *gin.Context) {
 	// Convert "Default" from string to bool
 	isDefault, err := strconv.ParseBool(c.PostForm("Default"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "Error",
-			"status code": "400",
-			"error":       "Invalid value for Default"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid default value", nil)
 		return
 	}
 	updatedAddress.IsDefault = isDefault
@@ -167,15 +135,11 @@ func CheckOutEditAddress(c *gin.Context) {
 	var existingAddress models.Address
 	if err := models.DB.Where("id = ? AND user_id = ?", addressID, userID).First(&existingAddress).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{
-				"status":      "Error",
-				"status code": "404",
-				"error":       "Address not found"})
+			helpers.SendResponse(c, http.StatusNotFound, "Address not found", nil)
+
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":      "Error",
-				"status code": "500",
-				"error":       "Failed to fetch address"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "IFailed to fetch address", nil)
+
 		}
 		return
 	}
@@ -196,11 +160,7 @@ func CheckOutEditAddress(c *gin.Context) {
 	// Update the address
 	if err := tx.Save(&existingAddress).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "Error",
-			"status code": "500",
-
-			"error": "Failed to update address"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update address", nil)
 		return
 	}
 
@@ -210,40 +170,28 @@ func CheckOutEditAddress(c *gin.Context) {
 			Where("user_id = ? AND id != ?", userID, addressID).
 			Update("is_default", false).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":      "Error",
-				"status code": "500",
-				"error":       "Failed to update default status of other addresses"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update default address", nil)
 			return
 		}
 	}
 
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "Error",
-			"status code": "500",
-			"error":       "Failed to complete address update"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update address", nil)
 		return
 	}
+	helpers.SendResponse(c, http.StatusOK, "Address updated successfully", nil, gin.H{"address": existingAddress})
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "Success",
-		"status code": "200",
-		"message":     "Address updated successfully",
-		"address":     existingAddress,
-	})
 }
+
+//........................................................Checkout...............................................................
 
 func Checkout(c *gin.Context) {
 	var coupon models.Coupon
 
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "Error",
-			"status code": "401",
-			"error":       "User not authenticated"})
+		helpers.SendResponse(c, http.StatusUnauthorized, "Unauthorized", nil)
 		return
 	}
 
@@ -256,10 +204,7 @@ func Checkout(c *gin.Context) {
 
 	if err := tx.Model(&models.Address{}).Where("id = ?", addressID).Update("address_phone", phone).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "Error",
-			"status code": "500",
-			"error":       "Failed to update address phone number"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update address phone number", nil)
 		return
 	}
 
@@ -270,15 +215,9 @@ func Checkout(c *gin.Context) {
 		if err := tx.Where("id = ? AND user_id = ?", addressID, userID).First(&address).Error; err != nil {
 			tx.Rollback()
 			if err == gorm.ErrRecordNotFound {
-				c.JSON(http.StatusNotFound, gin.H{
-					"Status":      "error",
-					"Status code": "404",
-					"error":       "Address not found or doesn't belong to the user"})
+				helpers.SendResponse(c, http.StatusNotFound, "Address not found or doesn't belong to the user", nil)
 			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"Status":      "error",
-					"Status code": "500",
-					"error":       "Failed to fetch address"})
+				helpers.SendResponse(c, http.StatusInternalServerError, "Failed to retrieve address", nil)
 			}
 			return
 		}
@@ -287,15 +226,9 @@ func Checkout(c *gin.Context) {
 		if err := tx.Where("user_id = ? AND is_default = ?", userID, true).First(&address).Error; err != nil {
 			tx.Rollback()
 			if err == gorm.ErrRecordNotFound {
-				c.JSON(http.StatusNotFound, gin.H{
-					"Status":      "error",
-					"Status code": "404",
-					"error":       "No default address found"})
+				helpers.SendResponse(c, http.StatusNotFound, "No default address found for the user", nil)
 			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"Status":      "error",
-					"Status code": "500",
-					"error":       "Failed to fetch default address"})
+				helpers.SendResponse(c, http.StatusInternalServerError, "Failed to retrieve default address", nil)
 			}
 			return
 		}
@@ -304,10 +237,7 @@ func Checkout(c *gin.Context) {
 	var cart models.Cart
 	if err := tx.Where("user_id = ?", userID).Preload("CartItems.Product").First(&cart).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusNotFound, gin.H{
-			"Status":      "error",
-			"Status code": "404",
-			"error":       "Cart not found"})
+		helpers.SendResponse(c, http.StatusNotFound, "cart not found", nil)
 		return
 	}
 
@@ -320,10 +250,7 @@ func Checkout(c *gin.Context) {
 
 		if err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"Status":      "error",
-				"Status code": "400",
-				"error":       err.Error()})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to validate coupon", nil)
 			return
 		}
 	}
@@ -331,10 +258,7 @@ func Checkout(c *gin.Context) {
 	if isValid {
 		if err := tx.Where("code = ?", Code).First(&coupon).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to fetch coupon details"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to retrieve coupon details", nil)
 			return
 		}
 
@@ -355,10 +279,8 @@ func Checkout(c *gin.Context) {
 		// Check stock
 		if cartItem.Quantity > int(cartItem.Product.Stock) {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"Status":      "error",
-				"Status code": "400",
-				"error":       "Not enough stock for " + cartItem.Product.Name})
+			helpers.SendResponse(c, http.StatusBadRequest, "Insufficient stock", nil)
+
 			return
 		}
 
@@ -383,10 +305,7 @@ func Checkout(c *gin.Context) {
 		// Update stock
 		if err := tx.Model(&cartItem.Product).Update("stock", gorm.Expr("stock - ?", cartItem.Quantity)).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to update stock"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update product stock", nil)
 			return
 		}
 	}
@@ -416,10 +335,7 @@ func Checkout(c *gin.Context) {
 		}
 		if err := tx.Create(&couponUsage).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to record coupon usage"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create coupon usage record", nil)
 
 		}
 	}
@@ -434,10 +350,8 @@ func Checkout(c *gin.Context) {
 
 		if err := tx.Create(&order).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to create order"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create order", nil)
+
 			return
 		}
 		fmt.Println("working1")
@@ -448,20 +362,14 @@ func Checkout(c *gin.Context) {
 
 		if err := tx.Create(&orderItems).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to create order items"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create order items", nil)
 			return
 		}
 		fmt.Println("working2")
 		// Clear the cart
 		if err := tx.Delete(&cart.CartItems).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to clear cart"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to clear cart", nil)
 			return
 		}
 		fmt.Println("beforras3")
@@ -471,22 +379,16 @@ func Checkout(c *gin.Context) {
 			var couponUsage models.CouponUsage
 			if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
 				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"Status":      "error",
-					"Status code": "500",
-					"error":       "Failed to fetch coupon usage"})
+				helpers.SendResponse(c, http.StatusInternalServerError, "Failed to get coupon usage record", nil)
 				return
 			}
 			fmt.Println("beforras4")
 			if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
 				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"Status":      "error",
-					"Status code": "500",
-					"error":       "Failed to update coupon usage"})
+				helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update coupon usage record", nil)
 				return
 			}
-			fmt.Println("beforras3")
+
 		}
 		razorpayClient := razorpay.NewClient(os.Getenv("KEY_ID"), os.Getenv("KEY_SECRET"))
 		paymentOrder, err := razorpayClient.Order.Create(map[string]interface{}{
@@ -496,11 +398,7 @@ func Checkout(c *gin.Context) {
 		}, nil)
 		if err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    500,
-				"status":  "Error",
-				"message": err.Error(),
-			})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create payment order", nil)
 			return
 		}
 		log.Printf("ff%v", paymentOrder)
@@ -516,36 +414,21 @@ func Checkout(c *gin.Context) {
 
 		if err := tx.Create(&payment).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to create payment",
-			})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create payment record", nil)
 			return
 		}
 		log.Printf("%v", paymentOrder["id"].(string))
 		if err := tx.Model(&models.Order{}).Where("id = ?", order.ID).Update("payment_id", paymentOrder["id"].(string)).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":      "error",
-				"status_code": "500",
-				"error":       "Failed to update order with payment ID: " + err.Error(),
-			})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update order payment id", nil)
 			return
 		}
 
 		if err := tx.Commit().Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status": "error",
-				"error":  "Failed to complete checkout"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to commit transaction", nil)
 			return
 		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"Status code":     "200",
-			"Status":          "success",
-			"message":         "Order placed successfully",
-			"order_id":        order.ID,
+		helpers.SendResponse(c, http.StatusOK, "Order placed successfully", nil, gin.H{"order_id": order.ID,
 			"total":           order.TotalAmount,
 			"offer_discount":  order.OfferDicount,
 			"coupon_discount": order.CouponDiscount,
@@ -553,17 +436,15 @@ func Checkout(c *gin.Context) {
 			"status":          order.Status,
 			"address_id":      order.AddressID,
 			"coupon_applied":  couponDiscount > 0,
-			"payment_ID":      payment.OrderID,
-		})
+			"payment_ID":      payment.OrderID})
 
+		//........................................................wallet............................................................
 	} else if paymentMethod == "Wallet" {
 
 		if err := tx.Create(&order).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to create order"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create order", nil)
+
 			return
 		}
 
@@ -574,20 +455,16 @@ func Checkout(c *gin.Context) {
 
 		if err := tx.Create(&orderItems).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to create order items"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create order items", nil)
+
 			return
 		}
 
 		// Clear the cart
 		if err := tx.Delete(&cart.CartItems).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to clear cart"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to clear cart", nil)
+
 			return
 		}
 
@@ -597,19 +474,15 @@ func Checkout(c *gin.Context) {
 			var couponUsage models.CouponUsage
 			if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
 				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"Status":      "error",
-					"Status code": "500",
-					"error":       "Failed to fetch coupon usage"})
+				helpers.SendResponse(c, http.StatusInternalServerError, "Failed to get coupon usage", nil)
+
 				return
 			}
 
 			if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
 				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"Status":      "error",
-					"Status code": "500",
-					"error":       "Failed to update coupon usage"})
+				helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update coupon usage", nil)
+
 				return
 			}
 		}
@@ -618,22 +491,14 @@ func Checkout(c *gin.Context) {
 
 		if err := tx.Where("user_id = ?", userID).First(&wallet).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to wallet details"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to get wallet", nil)
+
 			return
 		}
 
-		wallet.Balance = 1000
-
 		if order.FinalAmount > wallet.Balance {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"Status":      "error",
-				"Status code": "400",
-				"error":       "Insufficient balance in wallet",
-			})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Insufficient balance", nil)
 
 			return
 
@@ -644,21 +509,17 @@ func Checkout(c *gin.Context) {
 
 			if err := tx.Save(&wallet).Error; err != nil {
 				tx.Rollback()
+				helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update wallet", nil)
 				return
 			}
 
 		}
 		if err := tx.Commit().Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status": "error",
-				"error":  "Failed to complete checkout"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to commit transaction", nil)
+
 			return
 		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"Status code":     "200",
-			"Status":          "success",
-			"message":         "Order placed successfully",
+		helpers.SendResponse(c, http.StatusOK, "Order placed successfully", nil, gin.H{
 			"order_id":        order.ID,
 			"total":           order.TotalAmount,
 			"offer_discount":  order.OfferDicount,
@@ -674,10 +535,8 @@ func Checkout(c *gin.Context) {
 
 		if err := tx.Create(&order).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to create order"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create order", nil)
+
 			return
 		}
 
@@ -688,20 +547,16 @@ func Checkout(c *gin.Context) {
 
 		if err := tx.Create(&orderItems).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to create order items"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create order items", nil)
+
 			return
 		}
 
 		// Clear the cart
 		if err := tx.Delete(&cart.CartItems).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "error",
-				"Status code": "500",
-				"error":       "Failed to clear cart"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to clear cart", nil)
+
 			return
 		}
 
@@ -711,35 +566,26 @@ func Checkout(c *gin.Context) {
 			var couponUsage models.CouponUsage
 			if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
 				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"Status":      "error",
-					"Status code": "500",
-					"error":       "Failed to fetch coupon usage"})
+				helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create coupon usage", nil)
+
 				return
 			}
 
 			if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
 				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"Status":      "error",
-					"Status code": "500",
-					"error":       "Failed to update coupon usage"})
+				helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update coupon usage", nil)
+
 				return
 			}
 		}
 
 		// Commit the transaction
 		if err := tx.Commit().Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"Status": "error",
-				"error":  "Failed to complete checkout"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to commit transaction", nil)
+
 			return
 		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"Status code":     "200",
-			"Status":          "success",
-			"message":         "Order placed successfully",
+		helpers.SendResponse(c, http.StatusOK, "Order placed successfully", nil, gin.H{
 			"order_id":        order.ID,
 			"total":           order.TotalAmount,
 			"offer_discount":  order.OfferDicount,

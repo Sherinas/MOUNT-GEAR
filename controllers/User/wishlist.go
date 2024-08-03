@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"log"
+	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
 	"strconv"
@@ -9,14 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// .....................................................wish list page...............................................................
 func GetWishlist(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"status_code": "401",
-			"message":     "Unauthorized",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "user ubauthorized", nil)
 		return
 	}
 
@@ -26,11 +24,8 @@ func GetWishlist(c *gin.Context) {
 	// Adjusted Preload subquery
 	err := models.DB.Preload("Product").Preload("Product.Images", "id IN (SELECT MIN(id) FROM images GROUP BY product_id)").Where("user_id = ?", userID).Find(&wishlistItems).Error
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status_code": "500",
-			"message":     "Wishlist data not fetched",
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Wishlist data not fetched", nil)
+
 		return
 	}
 
@@ -47,34 +42,25 @@ func GetWishlist(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Wishlist fetched successfully",
-		"data":    response,
-	})
+	helpers.SendResponse(c, http.StatusOK, "Wishlist fetched successfully", nil, gin.H{"data": response})
 
 }
 
+// /.......................................................Add wishlist.........................................................
 func AddWishlist(c *gin.Context) {
 
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"status_code": "401",
-			"message":     "User not found",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "user unauthorized", nil)
+
 		return
 	}
 
 	productIDStr := c.Param("id")
 	productID, err := strconv.ParseUint(productIDStr, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status_code": "400",
-			"message":     "Invalid product ID",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid product ID", nil)
+
 		return
 	}
 
@@ -83,21 +69,15 @@ func AddWishlist(c *gin.Context) {
 
 	var product models.Product
 	if err := models.DB.Where("id = ?", productID).First(&product).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":      "error",
-			"status_code": "404",
-			"message":     "Product not found",
-		})
+		helpers.SendResponse(c, http.StatusNotFound, "Product not found", nil)
+
 		return
 	}
 
 	var existingWishlist models.Wishlist
 	if err := models.DB.Where("user_id = ? AND product_id = ?", userID, productID).First(&existingWishlist).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{
-			"status":      "error",
-			"status_code": "409",
-			"message":     "Product already in wishlist",
-		})
+		helpers.SendResponse(c, http.StatusConflict, "Product already in wishlist", nil)
+
 		return
 	}
 
@@ -106,64 +86,44 @@ func AddWishlist(c *gin.Context) {
 		ProductID: uint(productID),
 	}
 	if err := models.DB.Create(&wishlist).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status_code": "500",
-			"message":     "Failed to add product to wishlist",
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to add product to wishlist", nil)
+
 		return
 	}
+	helpers.SendResponse(c, http.StatusOK, "Product added to wishlist", nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Product added to wishlist",
-	})
 }
 
+// ..............................................................Delete wish list............................................
 func DeleteWishlist(c *gin.Context) {
 
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":      "error",
-			"status_code": "401",
-			"message":     "User not found",
-		})
+		helpers.SendResponse(c, http.StatusUnauthorized, "user unauthorized", nil)
+
 		return
 	}
 
 	productIDStr := c.Param("id")
 	productID, err := strconv.ParseUint(productIDStr, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status_code": "400",
-			"message":     "Invalid product ID",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid product ID", nil)
+
 		return
 	}
 
 	var wishlist models.Wishlist
 	if err := models.DB.Where("user_id = ? AND product_id = ?", userID, productID).First(&wishlist).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":      "error",
-			"status_code": "404",
-			"message":     "Wishlist entry not found",
-		})
+		helpers.SendResponse(c, http.StatusNotFound, "Product not found in wishlist", nil)
+
 		return
 	}
 
 	if err := models.DB.Delete(&wishlist).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status_code": "500",
-			"message":     "Failed to delete wishlist entry",
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to delete product from wishlist", nil)
+
 		return
 	}
+	helpers.SendResponse(c, http.StatusOK, "Wishlist entry deleted", nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Wishlist entry deleted",
-	})
 }

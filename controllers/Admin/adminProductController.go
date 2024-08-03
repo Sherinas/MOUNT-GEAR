@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
 	"path/filepath"
@@ -14,56 +15,43 @@ import (
 	"gorm.io/gorm"
 )
 
+// ........................................................list All products.......................................................
 func ListProducts(ctx *gin.Context) {
 	var products []models.Product
 
 	if err := models.FetchData(models.DB.Preload("Category"), &products); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "Error",
-			"status code": "500",
-
-			"error": "Could not fetch categories"})
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "could not fetch categories", nil)
 	}
+	helpers.SendResponse(ctx, http.StatusOK, "", nil, gin.H{"products": products})
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status":   "success",
-		"products": products})
 }
+
+//........................................................add product page..........................................................
 
 func GetNewProductForm(c *gin.Context) {
 	var categories []models.Category
 
 	if err := models.CheckStatus(models.DB, true, &categories); err != nil { // checking the status if the prodect is active or not
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "Error",
-			"status code": "500",
-			"error":       "Failed to fetch categories"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "could not fetch categories", nil)
 
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":     "success",
-		"Status":     "200",
-		"categories": categories,
-	})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"categories": categories})
+
 }
 
+// ..........................................................Create new product.......................................................
 func CreateProduct(ctx *gin.Context) {
 
 	if err := ctx.Request.ParseMultipartForm(10 << 20); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"Status":      "Error",
-			"status code": "400",
-			"error":       fmt.Sprintf("Failed to parse form: %v", err)})
+		helpers.SendResponse(ctx, http.StatusBadRequest, "could not parse form", nil)
+
 		return
 	}
 	form, err := ctx.MultipartForm()
 	if err != nil {
+		helpers.SendResponse(ctx, http.StatusBadRequest, "could not parse form", nil)
 
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"Status":      "Error",
-			"status code": "400",
-			"error":       fmt.Sprintf("Failed to parse form: %v", err)})
 		return
 	}
 
@@ -72,20 +60,15 @@ func CreateProduct(ctx *gin.Context) {
 	input.Name = ctx.PostForm("product_name")
 	input.Price, _ = strconv.ParseFloat(ctx.PostForm("product_price"), 64)
 	if input.Price < 0 {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"Status":      "Error",
-			"status code": "400",
-			"error":       "Price cannot be negative"})
+		helpers.SendResponse(ctx, http.StatusBadRequest, "price must be greater than 0", nil)
+
 		return
 	}
 
 	stock, _ := strconv.Atoi(ctx.PostForm("product_stock"))
 	input.Stock = int32(stock)
 	if input.Stock < 0 {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"Status":      "Error",
-			"status code": "400",
-			"error":       "Stock cannot be negative"})
+		helpers.SendResponse(ctx, http.StatusBadRequest, "stock must be greater than 0", nil)
 		return
 	}
 
@@ -93,10 +76,8 @@ func CreateProduct(ctx *gin.Context) {
 	if err == nil && discountPercentage >= 0 && discountPercentage <= 99 {
 		input.Discount = discountPercentage
 	} else {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"Status": "Error",
+		helpers.SendResponse(ctx, http.StatusBadRequest, "Invalid discount percentage. Must be between 0 and 99.", nil)
 
-			"error": "Invalid discount percentage. Must be between 0 and 99."})
 		return
 	}
 
@@ -107,29 +88,26 @@ func CreateProduct(ctx *gin.Context) {
 	result := models.DB.First(&categores, input.CategoryID)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+			helpers.SendResponse(ctx, http.StatusNotFound, "category not found", nil)
+
 		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+			helpers.SendResponse(ctx, http.StatusInternalServerError, "could not find category", nil)
+
 		}
 		return
 	}
 
 	if !categores.IsActive {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"Status":      "Error",
-			"Status code": "400",
-			"error":       "Category is not available"})
-		return
+		helpers.SendResponse(ctx, http.StatusNotFound, "category is not active", nil)
+
 	}
 
 	input.Description = ctx.PostForm("description")
 	input.IsActive = true
 
 	if err := models.CreateRecord(models.DB, &input, &input); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "Error",
-			"status code": "500",
-			"error":       "Failed to add product"})
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "could not create product", nil)
+
 		//**********************************************check this code and functions ********************************
 	}
 	// Process uploaded files
@@ -168,20 +146,17 @@ func CreateProduct(ctx *gin.Context) {
 	if len(images) > 0 {
 		if err := models.DB.Create(&images).Error; err != nil { // should change to function*********
 
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "Error",
-				"status code": "500",
-				"error":       "Failed to save image records"})
+			helpers.SendResponse(ctx, http.StatusInternalServerError, "Failed to save image records", nil)
+
 			return
 		}
 
 	}
+	helpers.SendResponse(ctx, http.StatusOK, "Product and images added successfully", nil, gin.H{"product_id": input.ID})
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"Status":      "Success",
-		"status code": "200",
-		"message":     "Product and images added successfully", "product_id": input.ID})
 }
+
+//....................................................................active and deactive product.................................
 
 func ToggleProductStatus(ctx *gin.Context) { // check the code
 	id := ctx.Param("id")
@@ -189,76 +164,53 @@ func ToggleProductStatus(ctx *gin.Context) { // check the code
 	var category models.Category
 
 	if err := models.GetRecordByID(models.DB, &product, id); err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"Status":      "Error",
-			"status code": "404",
-			"error":       "product not found"})
+		helpers.SendResponse(ctx, http.StatusNotFound, "product not found", nil)
 		return
 	}
 
 	if err := models.DB.First(&category, product.CategoryID).Error; err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "Error",
-			"status code": "500",
-			"error":       "Category not found"})
+		helpers.SendResponse(ctx, http.StatusNotFound, "Category not found", nil)
 		return
 	} // add to query function''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
 	// Check if the category is active
 	if !category.IsActive {
-		ctx.JSON(http.StatusForbidden, gin.H{
-			"Status":      "Error",
-			"status code": "403",
-			"error":       "Cannot change product status because the category is inactive"})
+		helpers.SendResponse(ctx, http.StatusNotFound, "Cannot change product status because the category is inactive", nil)
 		return
 	}
 
 	product.IsActive = !product.IsActive
 
 	if err := models.UpdateRecord(models.DB, &product); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "Error",
-			"status code": "500",
-			"error":       "Failed to update product status"})
+		helpers.SendResponse(ctx, http.StatusNotFound, "Failed to update product status", nil)
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"status code": "200",
-		"message":     "Product status updated successfully",
-		"product":     product})
+	helpers.SendResponse(ctx, http.StatusNotFound, "Product status updated successfully", nil, gin.H{"product": product})
 
 }
 
+// ..........................................................edit product page..............................................
 func GetEditProductForm(ctx *gin.Context) {
 	id := ctx.Param("id")
 	var product models.Product
 
 	if err := models.GetRecordByID(models.DB.Preload("Images"), &product, id); err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"Status":      "Error",
-			"status code": "404",
-			"error":       "product not found"})
+
+		helpers.SendResponse(ctx, http.StatusNotFound, "product not found", nil)
+
 	}
 
 	var categories []models.Category
 
 	if err := models.CheckStatus(models.DB, true, &categories); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "Error",
-			"status code": "500",
-			"error":       "Failed to retrieve categories"})
-	}
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "Failed to get categories", nil)
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"status code": "200",
-		"product":     product,
-		"categories":  categories,
-	})
+	}
+	helpers.SendResponse(ctx, http.StatusOK, "", nil, gin.H{"product": product, "categories": categories})
 
 }
 
+// ..........................................................Edit product...........................................................
 func UpdateProduct(ctx *gin.Context) {
 
 	id := ctx.Param("id")
@@ -266,10 +218,7 @@ func UpdateProduct(ctx *gin.Context) {
 	var existingProduct models.Product
 
 	if err := models.GetRecordByID(models.DB.Preload("Images"), &existingProduct, id); err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"Status":      "Error",
-			"status code": "404",
-			"error":       "product not found"})
+		helpers.SendResponse(ctx, http.StatusNotFound, "Product not found", nil)
 	}
 
 	updates := make(map[string]interface{})
@@ -283,10 +232,7 @@ func UpdateProduct(ctx *gin.Context) {
 	if price := ctx.PostForm("Price"); price != "" {
 		if priceFloat, err := strconv.ParseFloat(price, 64); err == nil {
 			if priceFloat < 0 {
-				ctx.JSON(http.StatusBadRequest, gin.H{
-					"Status":      "Error",
-					"status code": "400",
-					"error":       "Price cannot be negative"})
+				helpers.SendResponse(ctx, http.StatusBadRequest, "Price cannot be negative", nil)
 				return
 			}
 			updates["price"] = priceFloat
@@ -295,10 +241,7 @@ func UpdateProduct(ctx *gin.Context) {
 	if stock := ctx.PostForm("Stock"); stock != "" {
 		if stockInt, err := strconv.Atoi(stock); err == nil {
 			if stockInt < 0 {
-				ctx.JSON(http.StatusBadRequest, gin.H{
-					"Status":      "Error",
-					"status code": "400",
-					"error":       "Stock cannot be negative"})
+				helpers.SendResponse(ctx, http.StatusBadRequest, "Stock cannot be negative", nil)
 				return
 			}
 			updates["stock"] = stockInt
@@ -309,10 +252,7 @@ func UpdateProduct(ctx *gin.Context) {
 	if discountPercentage := ctx.PostForm("discount_percentage"); discountPercentage != "" {
 		if discountFloat, err := strconv.ParseFloat(discountPercentage, 64); err == nil {
 			if discountFloat < 0 || discountFloat > 99 {
-				ctx.JSON(http.StatusBadRequest, gin.H{
-					"Status":      "Error",
-					"status code": "400",
-					"error":       "Discount percentage must be between 0 and 99"})
+				helpers.SendResponse(ctx, http.StatusBadRequest, "Discount percentage must be between 0 and", nil)
 				return
 			}
 			updates["discount_price"] = discountFloat
@@ -323,56 +263,36 @@ func UpdateProduct(ctx *gin.Context) {
 	if categoryID := ctx.PostForm("category_id"); categoryID != "" {
 		catID, err := strconv.ParseUint(categoryID, 10, 32)
 		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"status":      "Error",
-				"status_code": 400,
-				"error":       "Invalid category ID"})
+			helpers.SendResponse(ctx, http.StatusBadRequest, "Invalid category ID", nil)
 			return
 		}
 
 		result := models.DB.First(&category, catID)
 		if result.Error != nil {
 			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-				ctx.JSON(http.StatusNotFound, gin.H{
-					"status":      "Error",
-					"status_code": 404,
-					"error":       "Category not found"})
+				helpers.SendResponse(ctx, http.StatusNotFound, "Category not found", nil)
 			} else {
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"status":      "Error",
-					"status_code": 500,
-					"error":       "Database error"})
+				helpers.SendResponse(ctx, http.StatusInternalServerError, "Failed to retrieve category", nil)
+
 			}
 			return
 		}
 
 		if !category.IsActive {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"status":      "Error",
-				"status_code": 400,
-				"error":       "Category is not available"})
+			helpers.SendResponse(ctx, http.StatusNotFound, "Category is inactive", nil)
+
 			return
 		}
 
 		updates["category_id"] = uint(catID)
 	} else {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"status":      "Error",
-			"status_code": 400,
-			"error":       "Category ID is required"})
+		helpers.SendResponse(ctx, http.StatusBadRequest, "Category ID is required", nil)
+
 		return
 	}
 
-	// If we reach here, the category is valid and active
-	// You can proceed with your logic using the validated category
-
-	// Update the product with the changes
-
 	if err := models.UpdateModel(models.DB, &existingProduct, updates); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "Error",
-			"status code": "500",
-			"error":       "Failed to update product"})
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "Failed to update product", nil)
 		return
 	}
 
@@ -393,19 +313,12 @@ func UpdateProduct(ctx *gin.Context) {
 		filename := filepath.Base(file.Filename)
 
 		if err := ctx.SaveUploadedFile(file, "public/uploads/"+filename); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"Status":      "Error",
-				"status code": "500",
-				"error":       "Failed to save image"})
+			helpers.SendResponse(ctx, http.StatusInternalServerError, "Failed to upload image", nil)
 			return
 		}
 		newImage := models.Image{ProductID: existingProduct.ID, ImageURL: "/uploads/" + filename}
 		models.DB.Create(&newImage)
 	} // **************************************************should change to function*******************************************
+	helpers.SendResponse(ctx, http.StatusOK, "Product updated successfully", nil)
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"Status":      "success",
-		"status code": "200",
-		"message":     "Product updated successfully",
-	})
 }

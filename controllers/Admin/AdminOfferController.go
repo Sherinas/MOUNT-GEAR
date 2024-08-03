@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
 	"strconv"
@@ -9,26 +10,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// .......................................................list offer...............................................
 func ListOffers(c *gin.Context) {
 
 	var offer []models.Offer
 
 	if err := models.FetchData(models.DB, &offer); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":       "Could not fetch categories",
-			"Status code": "500",
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch categories", nil)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"Status code": "200",
-		"categories":  offer,
-	})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"categories": offer})
 
 }
 
+// .............................................................offer creating page......................................
 func GetNewOfferForm(c *gin.Context) {
 
 	var categories []struct {
@@ -44,12 +39,7 @@ func GetNewOfferForm(c *gin.Context) {
 		Select("id,name").
 		Where("is_active = ?", true).
 		Find(&categories).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Could not fetch categories",
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch categories", nil)
 		return
 	}
 
@@ -57,23 +47,15 @@ func GetNewOfferForm(c *gin.Context) {
 		Select("id,name").
 		Where("is_active = ?", true).
 		Find(&products).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Could not fetch products",
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch products", nil)
+
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"Status code": "200",
-		"products":    products,
-		"categories":  categories,
-	})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"products": products, "categories": categories})
 
 }
 
+// ...........................................................create offers.......................................................
 func CreateOffer(c *gin.Context) {
 	var input models.Offer
 
@@ -83,10 +65,7 @@ func CreateOffer(c *gin.Context) {
 	validTo := c.PostForm("End_Date")
 
 	if offerType != "category" && offerType != "product" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid offer type",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid offer type", nil)
 		return
 	}
 	input.OfferType = offerType
@@ -94,10 +73,7 @@ func CreateOffer(c *gin.Context) {
 	// Parse and validate discount percentage
 	discount, err := strconv.ParseFloat(discountPercentage, 64)
 	if err != nil || discount <= 0 || discount > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid discount percentage",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid discount percentage", nil)
 		return
 	}
 	input.DiscountPercentage = discount
@@ -105,43 +81,31 @@ func CreateOffer(c *gin.Context) {
 	// Parse and validate dates
 	startDate, err := time.Parse("2006-01-02", validFrom)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid start date format",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid start date", nil)
 		return
 	}
 	input.ValidFrom = startDate
 
 	endDate, err := time.Parse("2006-01-02", validTo)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid end date format",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid end date", nil)
+
 		return
 	}
 	input.ValidTo = endDate
 
 	if endDate.Before(startDate) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "End date must be after start date",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "End date must be after start date", nil)
 		return
 	}
 
-	// Start a database transaction
-	tx := models.DB.Begin()
+	tx := models.DB.Begin() // start databse transaction
 
 	if offerType == "category" {
 		categoryID, err := strconv.ParseUint(c.PostForm("Category_Id"), 10, 32)
 		if err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error",
-				"error":  "Invalid Category ID",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Invalid category ID", nil)
 			return
 		}
 		uintCategoryID := uint(categoryID)
@@ -150,30 +114,21 @@ func CreateOffer(c *gin.Context) {
 		var category models.Category
 		if err := tx.Where("id = ? AND is_active = ?", uintCategoryID, true).First(&category).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error",
-				"error":  "Category not found or inactive",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Category is not found or inactive", nil)
 			return
 		}
 
 		// Update all products in the category
 		if err := tx.Model(&models.Product{}).Where("category_id = ?", uintCategoryID).Update("discount", discount).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status": "error",
-				"error":  "Failed to update products in category",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Failed to update products", nil)
 			return
 		}
 	} else {
 		productID, err := strconv.ParseUint(c.PostForm("Product_Id"), 10, 32)
 		if err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error",
-				"error":  "Invalid Product ID",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Invalid product ID", nil)
 			return
 		}
 		uintProductID := uint(productID)
@@ -182,58 +137,45 @@ func CreateOffer(c *gin.Context) {
 		var product models.Product
 		if err := tx.Where("id = ? AND is_active = ?", uintProductID, true).First(&product).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error",
-				"error":  "Product not found or inactive",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Product is not found or inactive", nil)
+
 			return
 		}
 
 		if err := tx.Model(&product).Update("discount", discount).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status": "error",
-				"error":  "Failed to update product discount",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Failed to update product discount", nil)
 			return
 		}
 	}
 
 	if err := tx.Create(&input).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
-			"error":  "Failed to create offer",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Failed to create offer", nil)
+
 		return
 	}
 
 	tx.Commit()
+	helpers.SendResponse(c, http.StatusCreated, "", nil, gin.H{"offer": input})
 
-	c.JSON(http.StatusCreated, gin.H{
-		"status": "success",
-		"offer":  input,
-	})
 }
+
+//.........................................................Edit offer page.........................................................
 
 func GetEditOfferForm(c *gin.Context) {
 	offerID := c.Param("offerID")
 
 	uintOfferID, err := strconv.ParseUint(offerID, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid offer ID",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid offer ID", nil)
+
 		return
 	}
 
 	var offer models.Offer
 	if err := models.DB.First(&offer, uintOfferID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status": "error",
-			"error":  "Offer not found",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Offer is not found", nil)
 		return
 	}
 
@@ -245,10 +187,8 @@ func GetEditOfferForm(c *gin.Context) {
 		Select("id, name").
 		Where("is_active = ?", true).
 		Find(&categories).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
-			"error":  "Could not fetch categories",
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to get categories", nil)
+
 		return
 	}
 
@@ -260,10 +200,7 @@ func GetEditOfferForm(c *gin.Context) {
 		Select("id, name").
 		Where("is_active = ?", true).
 		Find(&products).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
-			"error":  "Could not fetch products",
-		})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to get products", nil)
 		return
 	}
 
@@ -296,24 +233,21 @@ func GetEditOfferForm(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// ..........................................................edit offer.................................................
 func UpdateOffer(c *gin.Context) {
 	offerID := c.Param("offerID")
 
 	uintOfferID, err := strconv.ParseUint(offerID, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid offer ID",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid offer ID", nil)
+
 		return
 	}
 
 	var existingOffer models.Offer
 	if err := models.DB.First(&existingOffer, uintOfferID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status": "error",
-			"error":  "Offer not found",
-		})
+		helpers.SendResponse(c, http.StatusNotFound, "Offer not found", nil)
+
 		return
 	}
 
@@ -323,50 +257,39 @@ func UpdateOffer(c *gin.Context) {
 	validTo := c.PostForm("End_Date")
 
 	if offerType != "category" && offerType != "product" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid offer type",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid offer type", nil)
+
 		return
 	}
 
 	discount, err := strconv.ParseFloat(discountPercentage, 64)
 	if err != nil || discount <= 0 || discount > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid discount percentage",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid discount percentage", nil)
+
 		return
 	}
 
 	// Parse and validate dates
 	startDate, err := time.Parse("2006-01-02", validFrom)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid start date format",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid start date", nil)
+
 		return
 	}
 
 	endDate, err := time.Parse("2006-01-02", validTo)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid end date format",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid end date", nil)
 		return
 	}
 
 	if endDate.Before(startDate) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "End date must be after start date",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "End date cannot be before start date", nil)
+
 		return
 	}
 
-	tx := models.DB.Begin()
+	tx := models.DB.Begin() // start transaction
 
 	// Update offer fields
 	existingOffer.OfferType = offerType
@@ -378,10 +301,7 @@ func UpdateOffer(c *gin.Context) {
 		categoryID, err := strconv.ParseUint(c.PostForm("Category_Id"), 10, 32)
 		if err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error",
-				"error":  "Invalid Category ID",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Invalid category ID", nil)
 			return
 		}
 		uintCategoryID := uint(categoryID)
@@ -391,29 +311,21 @@ func UpdateOffer(c *gin.Context) {
 		var category models.Category
 		if err := tx.Where("id = ? AND is_active = ?", uintCategoryID, true).First(&category).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error",
-				"error":  "Category not found or inactive",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Category not found", nil)
 			return
 		}
 
 		if err := tx.Model(&models.Product{}).Where("category_id = ?", uintCategoryID).Update("discount", discount).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status": "error",
-				"error":  "Failed to update products in category",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Failed to update product in category", nil)
+
 			return
 		}
 	} else {
 		productID, err := strconv.ParseUint(c.PostForm("Product_Id"), 10, 32)
 		if err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error",
-				"error":  "Invalid Product ID",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Invalid product ID", nil)
 			return
 		}
 		uintProductID := uint(productID)
@@ -423,49 +335,37 @@ func UpdateOffer(c *gin.Context) {
 		var product models.Product
 		if err := tx.Where("id = ? AND is_active = ?", uintProductID, true).First(&product).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error",
-				"error":  "Product not found or inactive",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Product not found or inactive", nil)
 			return
 		}
 
 		if err := tx.Model(&product).Update("discount", discount).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status": "error",
-				"error":  "Failed to update product discount",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Failed to update product discount", nil)
+
 			return
 		}
 	}
 
 	if err := tx.Save(&existingOffer).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
-			"error":  "Failed to update offer",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Failed to save offer", nil)
 		return
 	}
 
 	tx.Commit()
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"offer": existingOffer})
 
-	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"offer":  existingOffer,
-	})
 }
 
+// .............................................................delete offer.....................................................
 func DeleteOffer(c *gin.Context) {
 	offerID := c.Param("offerID")
 
 	uintOfferID, err := strconv.ParseUint(offerID, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
-			"error":  "Invalid offer ID",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid offer ID", nil)
+
 		return
 	}
 
@@ -474,10 +374,8 @@ func DeleteOffer(c *gin.Context) {
 	var offer models.Offer
 	if err := tx.First(&offer, uintOfferID).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusNotFound, gin.H{
-			"status": "error",
-			"error":  "Offer not found",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Offer not found", nil)
+
 		return
 	}
 
@@ -485,37 +383,25 @@ func DeleteOffer(c *gin.Context) {
 
 		if err := tx.Model(&models.Product{}).Where("category_id = ?", offer.CategoryID).Update("discount", 0).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status": "error",
-				"error":  "Failed to reset discounts for products in category",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Failed to reset discounts for products in category", nil)
 			return
 		}
 	} else if offer.OfferType == "product" && offer.ProductID != nil {
 		// Reset discount for the specific product
 		if err := tx.Model(&models.Product{}).Where("id = ?", offer.ProductID).Update("discount", 0).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status": "error",
-				"error":  "Failed to reset discount for product",
-			})
+			helpers.SendResponse(c, http.StatusBadRequest, "Failed to reset discount for product", nil)
 			return
 		}
 	}
 
 	if err := tx.Delete(&offer).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
-			"error":  "Failed to delete offer",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Failed to delete offer", nil)
 		return
 	}
 
 	tx.Commit()
+	helpers.SendResponse(c, http.StatusOK, "Offer deleted successfully", nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Offer deleted successfully",
-	})
 }

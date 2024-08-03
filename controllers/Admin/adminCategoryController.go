@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
 	"strings"
@@ -9,35 +10,29 @@ import (
 	"gorm.io/gorm"
 )
 
+//......................................list all category.......................................
+
 func ListCategories(ctx *gin.Context) {
 	var categories []models.Category
 
 	if err := models.FetchData(models.DB, &categories); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":       "Could not fetch categories",
-			"Status code": "500",
-		})
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "could not fetch categories", nil)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"Status code": "200",
-		"categories":  categories,
-	})
+	helpers.SendResponse(ctx, http.StatusOK, "Success", nil, gin.H{"categories": categories})
 
 }
 
+// ..........................................Category add page........................................
 func GetNewCategoryForm(ctx *gin.Context) {
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"Status code": "200",
-		"message":     "Add Category Page",
-	})
+	helpers.SendResponse(ctx, http.StatusOK, "Add Category Page", nil)
+
 }
 
-func CreateCategory(ctx *gin.Context) { // adding Category
+// ....................................... Create category...........................................
+func CreateCategory(ctx *gin.Context) {
 	var input models.Category
 
 	input.Name = ctx.PostForm("category_name")
@@ -50,45 +45,36 @@ func CreateCategory(ctx *gin.Context) { // adding Category
 	// check if category already exists
 
 	if models.CheckExists(models.DB, &existingCategory, "LOWER(name) = ?", inputNameLower) {
-		ctx.JSON(http.StatusConflict, gin.H{
-			"status":      "error",
-			"Status code": "409",
-			"error":       "Category already exists"})
+		helpers.SendResponse(ctx, http.StatusConflict, "Category already exists", nil)
 		return
 	}
 
 	if err := ctx.ShouldBind(&input); err != nil {
+
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	input.IsActive = true
+	input.IsActive = true //
 
 	// create New Category.
 
 	if err := models.CreateRecord(models.DB, &input, &input); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Failed to add category"})
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "Failed to add category", nil)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"status": "success",
-		"Status code": "200",
-		"message":     "Category created successfully"})
+	helpers.SendResponse(ctx, http.StatusOK, "Category Create Successfully", nil)
+
 }
 
-func ToggleCategoryStatus(ctx *gin.Context) { // Toggle Button
+func ToggleCategoryStatus(ctx *gin.Context) { // Toggle Button(deactivating Category)
 	id := ctx.Param("id")
 	var category models.Category
 
 	if err := models.GetRecordByID(models.DB, &category, id); err != nil {
 		if err == gorm.ErrRecordNotFound {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"status":      "error",
-				"Status code": "404",
-				"error":       "Category not found"})
+			helpers.SendResponse(ctx, http.StatusNotFound, "Category not found", nil)
 			return
 		}
 
@@ -97,50 +83,34 @@ func ToggleCategoryStatus(ctx *gin.Context) { // Toggle Button
 	category.IsActive = !category.IsActive
 
 	if err := models.UpdateProductStatusByCategory(models.DB, category.ID, category.IsActive); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Could not update products status"})
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "Could not update products status", nil)
 		return
 	}
 	if err := models.UpdateRecord(models.DB, &category); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Could not update category status"})
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "Failed to update category status", nil)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"Status code": "200",
-		"message":     "Category status updated successfully",
-		"category":    category,
-	})
+	helpers.SendResponse(ctx, http.StatusOK, "Category Status update successfully", nil, gin.H{"category": category})
 }
 
+// ...................................................................Edit category page .....................................
 func GetEditCategoryForm(ctx *gin.Context) { // Edit Category
 	id := ctx.Param("id")
 	var category models.Category
 
 	if err := models.GetRecordByID(models.DB, &category, id); err != nil {
 		if err == gorm.ErrRecordNotFound {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"status":      "error",
-				"Status code": "404",
-				"error":       "Category not found"})
+			helpers.SendResponse(ctx, http.StatusNotFound, "Category not found", nil)
 			return
 		}
 
 	}
+	helpers.SendResponse(ctx, http.StatusOK, "", nil, gin.H{"Category": category})
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"Status code": "200",
-		"Category":    category,
-	})
 }
 
+// .............................................................editing category..................................................
 func UpdateCategory(ctx *gin.Context) { //Update category
 	id := ctx.Param("id")
 	var category models.Category
@@ -149,10 +119,9 @@ func UpdateCategory(ctx *gin.Context) { //Update category
 
 	if err := models.GetRecordByID(models.DB, &category, id); err != nil {
 		if err == gorm.ErrRecordNotFound {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"status":      "error",
-				"Status code": "404",
-				"error":       "Category not found"})
+
+			helpers.SendResponse(ctx, http.StatusNotFound, "Category not found", nil)
+
 			return
 		}
 
@@ -176,19 +145,14 @@ func UpdateCategory(ctx *gin.Context) { //Update category
 	// Save updates
 
 	if err := models.UpdateRecord(models.DB, &category); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Failed to update category"})
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "Failed to update category", nil)
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"status code": "200",
+	helpers.SendResponse(ctx, http.StatusOK, "", nil, gin.H{"Category": category})
 
-		"Category": category,
-	})
 }
+
+//.................................................search Category...........................................................
 
 func SearchCategories(c *gin.Context) {
 
@@ -197,15 +161,10 @@ func SearchCategories(c *gin.Context) {
 	var categories []models.Category
 
 	if err := models.SearchRecord(models.DB, query, &categories); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"Status code": "500",
-			"error":       "Could not search categories"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not search categories", nil)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"status code": "200",
-		"category":    categories})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"category": categories})
+
 }

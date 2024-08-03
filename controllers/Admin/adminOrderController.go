@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"log"
+	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
 	"time"
@@ -11,16 +12,14 @@ import (
 	"gorm.io/gorm"
 )
 
+// .........................................................list orders..........................................................
 func ListOrders(ctx *gin.Context) {
 	var orders []models.Order
 	if err := models.DB.Preload("Items").
 		Where("payment_status = ?", true).
 		Order("created_at DESC").
 		Find(&orders).Error; err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"Status":      "Error",
-			"Status code": "500",
-			"error":       "Could not fetch orders"})
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "could not fetch orders", nil)
 		return
 	}
 
@@ -57,48 +56,34 @@ func ListOrders(ctx *gin.Context) {
 			Amount:      finalAmount,
 		})
 	}
+	helpers.SendResponse(ctx, http.StatusOK, "", nil, gin.H{"data": response})
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"status code": "200",
-		"data":        response,
-	})
 }
 
+// .........................................................order details.............................................................
 func OrderDetails(c *gin.Context) {
 	orderID := c.Param("order_id")
 
 	var order models.Order
 	if err := models.DB.Preload("Items").First(&order, orderID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"status":      "error",
-				"status code": "404",
-				"error":       "Order not found"})
+			helpers.SendResponse(c, http.StatusNotFound, "order not found", nil)
+
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":      "error",
-				"status code": "500",
-				"error":       "Could not fetch order"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "could not fetch order", nil)
 		}
 		return
 	}
 
 	var user models.User
 	if err := models.DB.First(&user, order.UserID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status code": "500",
-			"error":       "Could not fetch user information"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch user information", nil)
 		return
 	}
 
 	var address models.Address
 	if err := models.DB.First(&address, order.AddressID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":      "error",
-			"status code": "500",
-			"error":       "Could not fetch address information"})
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch address information", nil)
 		return
 	}
 
@@ -118,12 +103,9 @@ func OrderDetails(c *gin.Context) {
 		var product models.Product
 		if err := models.DB.Preload("Images", func(db *gorm.DB) *gorm.DB {
 			return db.Limit(1) // This will fetch only one image per product
+
 		}).First(&product, item.ProductID).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":      "error",
-				"status code": "500",
-				"error":       "Failed to fetch product",
-			})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch product ", nil)
 			return
 		}
 
@@ -186,14 +168,10 @@ func OrderDetails(c *gin.Context) {
 		CreatedAt:     order.CreatedAt,
 		TotalQuantity: totalQuantity,
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":      "success",
-		"status code": "200",
-		"order":       response,
-		"Products":    products,
-	})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"order": response, "Products": products})
 }
+
+//...................................................Update order status...........................................
 
 func UpdateOrderStatus(c *gin.Context) {
 	orderID := c.Param("order_id")
@@ -204,10 +182,7 @@ func UpdateOrderStatus(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status code": "400",
-			"error":       "Invalid input"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid Input", nil)
 		return
 	}
 
@@ -221,10 +196,7 @@ func UpdateOrderStatus(c *gin.Context) {
 		}
 	}
 	if !isValidStatus {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status code": "400",
-			"error":       "Invalid order status"})
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid order Status", nil)
 		return
 	}
 
@@ -232,15 +204,11 @@ func UpdateOrderStatus(c *gin.Context) {
 	var order models.Order
 	if err := models.DB.First(&order, orderID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"status":      "error",
-				"status code": "404",
-				"error":       "Order not found"})
+			helpers.SendResponse(c, http.StatusNotFound, "Order not found", nil)
+
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":      "error",
-				"status code": "500",
-				"error":       "Could not fetch order"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch order", nil)
+
 		}
 		return
 	}
@@ -249,30 +217,15 @@ func UpdateOrderStatus(c *gin.Context) {
 	log.Printf("%v", input.Status)
 
 	if order.Status == "Canceled" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":      "error",
-			"status code": "400",
-			"error":       "Cannot update canceled order",
-		})
+		helpers.SendResponse(c, http.StatusBadRequest, "Order is already canceled", nil)
 		return
 	} else {
 		if err := models.DB.Model(&order).Update("status", input.Status).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":      "error",
-				"status code": "500",
-				"error":       "Could not update order status"})
+			helpers.SendResponse(c, http.StatusInternalServerError, "Could not update order status", nil)
 			return
 		}
+		helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"id": order.ID, "status": order.Status})
 
-		c.JSON(http.StatusOK, gin.H{
-
-			"status":      "success",
-			"status code": "200",
-			"order": gin.H{
-				"id":     order.ID,
-				"status": order.Status,
-			},
-		})
 	}
 
 }
