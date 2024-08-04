@@ -20,7 +20,7 @@ type Order struct {
 	CreatedAt          time.Time   `gorm:"autoCreateTime"`
 	UpdatedAt          time.Time   `gorm:"autoUpdateTime"`
 	PaymentID          string      `gorm:"column:payment_id;size:100"`
-	paymentStatus      bool        `gorm:"default:true"`
+	PaymentStatus      bool        `gorm:"default:true"`
 }
 
 type OrderItem struct {

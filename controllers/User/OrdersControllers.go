@@ -18,7 +18,6 @@ import (
 func GetAllOrders(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-
 		helpers.SendResponse(c, http.StatusUnauthorized, "user not Authenticated", nil)
 
 	}
@@ -133,7 +132,7 @@ func GetAllOrders(c *gin.Context) {
 			Items:         orderItems,
 		})
 	}
-	helpers.SendResponse(c, http.StatusUnauthorized, "", nil, gin.H{"orders": response})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"orders": response})
 
 }
 
@@ -221,10 +220,14 @@ func GetOrderDetails(c *gin.Context) {
 		products = append(products, productInfo)
 		totalQuantity += item.Quantity
 	}
+
 	var payment models.Payment
-	if err := models.DB.Where("order_id = ?", order.PaymentID).First(&payment).Error; err != nil {
-		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch payment", nil)
-		return
+
+	if order.PaymentMethod == "Online" {
+		if err := models.DB.Where("order_id = ?", order.PaymentID).First(&payment).Error; err != nil {
+			helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch payment", nil)
+			return
+		}
 	}
 
 	payStatus := ""
@@ -367,10 +370,20 @@ func ReturnOrder(c *gin.Context) {
 		}
 
 		if order.Status != "Delivered" {
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to  Cancel order", nil)
 			return fmt.Errorf("order cannot be canceled after delivary ")
 		}
 
 		order.Status = "Return"
+
+		for _, item := range order.Items {
+			if err := models.DB.Model(&models.Product{}).
+				Where("id = ?", item.ProductID).
+				UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
+
+				return err
+			}
+		}
 		order.ReturnReason = input.ReturnReason
 		if err := tx.Save(&order).Error; err != nil {
 			return err
@@ -380,7 +393,7 @@ func ReturnOrder(c *gin.Context) {
 	})
 
 	if err != nil {
-		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to  Cancel order", nil)
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to  Cancel order. onle delivered product can return", nil)
 		return
 	}
 

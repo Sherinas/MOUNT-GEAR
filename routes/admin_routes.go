@@ -65,6 +65,7 @@ func AdminRoutes(router *gin.Engine) {
 		admin.GET("/logout", controllers.LogoutAdmin)
 
 		//reports
+		admin.GET("/reports", controllers.GetSalesReport)
 		admin.POST("/reports", controllers.SalesReport)
 
 	}

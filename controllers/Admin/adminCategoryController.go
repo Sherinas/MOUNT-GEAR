@@ -1,9 +1,11 @@
 package controllers
 
 import (
+	"fmt"
 	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -68,6 +70,7 @@ func CreateCategory(ctx *gin.Context) {
 
 }
 
+// ................................................................................toggle...............................
 func ToggleCategoryStatus(ctx *gin.Context) { // Toggle Button(deactivating Category)
 	id := ctx.Param("id")
 	var category models.Category
@@ -112,10 +115,15 @@ func GetEditCategoryForm(ctx *gin.Context) { // Edit Category
 
 // .............................................................editing category..................................................
 func UpdateCategory(ctx *gin.Context) { //Update category
-	id := ctx.Param("id")
+	idStr := ctx.Param("id")
 	var category models.Category
 
-	// Find existing category
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		helpers.SendResponse(ctx, http.StatusBadRequest, "Invalid id parameter", err)
+		return
+	}
+	fmt.Println(id)
 
 	if err := models.GetRecordByID(models.DB, &category, id); err != nil {
 		if err == gorm.ErrRecordNotFound {

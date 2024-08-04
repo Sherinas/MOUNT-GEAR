@@ -47,6 +47,10 @@ func ListOrders(ctx *gin.Context) {
 		actualDiscount := actualAmount * discountPercentage
 		finalAmount := actualAmount - actualDiscount
 
+		if order.Status == "Partially Canceled" {
+			order.Status = "Pending"
+		}
+
 		response = append(response, OrderResponse{
 			ID:          order.ID,
 			UserID:      order.UserID,
@@ -136,6 +140,13 @@ func OrderDetails(c *gin.Context) {
 
 	finalAmount := totalAmountWithoutDiscount - totalDiscount
 
+	var paymentStatus string
+	if order.PaymentMethod == "Online" || order.PaymentStatus {
+		paymentStatus = "Success"
+	} else {
+		paymentStatus = "Pending"
+	}
+
 	response := struct {
 		OrderID            uint      `json:"order_id"`
 		Username           string    `json:"username"`
@@ -168,7 +179,7 @@ func OrderDetails(c *gin.Context) {
 		CreatedAt:     order.CreatedAt,
 		TotalQuantity: totalQuantity,
 	}
-	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"order": response, "Products": products})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"order": response, "Products": products, "Payment Status": paymentStatus})
 }
 
 //...................................................Update order status...........................................

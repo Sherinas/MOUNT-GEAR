@@ -1,8 +1,6 @@
 package models
 
 import (
-	"strconv"
-
 	"gorm.io/gorm"
 )
 
@@ -40,12 +38,8 @@ func CreateRecorddata(db *gorm.DB, data interface{}) error {
 }
 
 // //////////////////////////////////////////////////////////////////////////
-func GetRecordByID(db *gorm.DB, model interface{}, id string) error {
+func GetRecordByID(db *gorm.DB, model interface{}, recordID interface{}) error {
 	// Convert id to integer
-	recordID, err := strconv.Atoi(id)
-	if err != nil {
-		return err
-	}
 
 	// Fetch the record by ID
 	if err := db.First(model, recordID).Error; err != nil {

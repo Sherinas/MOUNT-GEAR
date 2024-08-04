@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
 	"path/filepath"
@@ -30,7 +31,6 @@ func SalesReport(c *gin.Context) {
 	var startTime, endTime time.Time
 	var err error
 
-	// Set time range based on filter
 	switch filterData {
 	case "daily":
 		startTime = time.Now().AddDate(0, 0, -1)
@@ -63,14 +63,20 @@ func SalesReport(c *gin.Context) {
 	}
 
 	var orders []models.Order
-	err = models.DB.Where("created_at BETWEEN ? AND ?", startTime, endTime).
+	err = models.DB.Where("created_at BETWEEN ? AND ?", startTime, endTime).Where("status = ?", "Delivered").
 		Select("id", "user_id", "final_amount", "payment_method", "coupon_discount", "status", "created_at").
 		Find(&orders).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching orders: " + err.Error()})
 		return
 	}
-
+	// err = models.DB.Where("created_at BETWEEN ? AND ?", startTime, endTime).Where("status = ? OR (status = ? AND payment_method = ? AND payment_status = ?)", "Delivered", "Pending", "Online", true).
+	// 	Select("id", "user_id", "final_amount", "payment_method", "coupon_discount", "status", "created_at").
+	// 	Find(&orders).Error
+	// if err != nil {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching orders: " + err.Error()})
+	// 	return
+	// }
 	var report []SalesReportItem
 	for _, order := range orders {
 		var user models.User
@@ -140,6 +146,7 @@ func generatePDF(report []SalesReportItem) (string, error) {
 	pdf.Ln(-1)
 
 	pdf.SetFont("Arial", "", 10)
+	var totalDiscountAmount float64
 	var totalAmount float64
 	for _, item := range report {
 		pdf.Cell(32, 8, strconv.Itoa(int(item.OrderID)))
@@ -150,6 +157,8 @@ func generatePDF(report []SalesReportItem) (string, error) {
 		pdf.Cell(32, 8, item.Date)
 		pdf.Ln(-1)
 		totalAmount += item.FinalAmount
+		totalDiscountAmount += item.CouponDiscount //coupon descount
+
 	}
 
 	pdf.Ln(10)
@@ -157,6 +166,8 @@ func generatePDF(report []SalesReportItem) (string, error) {
 	pdf.Cell(0, 10, fmt.Sprintf("Total Sales Count: %d", len(report)))
 	pdf.Ln(-1)
 	pdf.Cell(0, 10, fmt.Sprintf("Total Amount: %.2f", totalAmount))
+	pdf.Ln(-1)
+	// pdf.Cell(0, 10, fmt.Sprintf("Total Coupon Dicount : %.2f", totalDiscountAmount))
 
 	//	tempFilePath := "C:/Users/Sherinas/Downloads/sales_report.pdf"
 	err := pdf.OutputFileAndClose(pdfPath)
@@ -165,4 +176,89 @@ func generatePDF(report []SalesReportItem) (string, error) {
 	}
 
 	return pdfPath, nil
+}
+
+func GetSalesReport(c *gin.Context) {
+	filterData := c.Query("filter")
+
+	var startTime, endTime time.Time
+	var err error
+
+	// Set time range based on filter
+	switch filterData {
+	case "daily":
+		startTime = time.Now().AddDate(0, 0, -1)
+		endTime = time.Now()
+	case "weekly":
+		startTime = time.Now().AddDate(0, 0, -7)
+		endTime = time.Now()
+	case "monthly":
+		startTime = time.Now().AddDate(0, -1, 0)
+		endTime = time.Now()
+	case "yearly":
+		startTime = time.Now().AddDate(-1, 0, 0)
+		endTime = time.Now()
+	case "custom":
+		startStr := c.Query("start_date")
+		endStr := c.Query("end_date")
+		startTime, err = time.Parse("2006-01-02", startStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start date format. Use YYYY-MM-DD"})
+			return
+		}
+		endTime, err = time.Parse("2006-01-02", endStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end date format. Use YYYY-MM-DD"})
+			return
+		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter parameter"})
+		return
+	}
+
+	var orders []models.Order
+	err = models.DB.Where("created_at BETWEEN ? AND ?", startTime, endTime).Where("status = ?", "Delivered").
+		Select("id", "user_id", "final_amount", "payment_method", "coupon_discount", "status", "created_at").Order("created_at DESC").
+		Find(&orders).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching orders: " + err.Error()})
+		return
+	}
+
+	var report []SalesReportItem
+	for _, order := range orders {
+		var user models.User
+		err := models.DB.Select("name").First(&user, order.UserID).Error
+		if err != nil {
+
+			user.Name = "Unknown User"
+		}
+
+		var items []models.OrderItem
+		if err := models.DB.Where("order_id = ?", order.ID).Find(&items).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching order items: " + err.Error()})
+			return
+		}
+
+		totalQuantity := 0
+		for _, item := range items {
+			totalQuantity += item.Quantity
+		}
+
+		reportItem := SalesReportItem{
+			OrderID:        order.ID,
+			UserID:         order.UserID,
+			CustomerName:   user.Name,
+			FinalAmount:    order.FinalAmount,
+			PaymentMethod:  order.PaymentMethod,
+			CouponDiscount: order.CouponDiscount,
+			Status:         order.Status,
+			Date:           order.CreatedAt.Format("2006-01-02"),
+			TotalQuantity:  totalQuantity,
+		}
+		report = append(report, reportItem)
+	}
+
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"report": report})
+
 }

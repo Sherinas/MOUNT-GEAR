@@ -15,11 +15,15 @@ func ListOffers(c *gin.Context) {
 
 	var offer []models.Offer
 
-	if err := models.FetchData(models.DB, &offer); err != nil {
-		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch categories", nil)
+	// if err := models.FetchData(models.DB, &offer); err != nil {
+	// 	helpers.SendResponse(c, http.StatusInternalServerError, "Could not offers", nil)
+	// 	return
+	// }
+	if err := models.DB.Order("updated_at DESC").Find(&offer).Error; err != nil {
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch offers", nil)
 		return
 	}
-	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"categories": offer})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"offers": offer})
 
 }
 

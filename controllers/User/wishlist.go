@@ -29,6 +29,8 @@ func GetWishlist(c *gin.Context) {
 		return
 	}
 
+	wishlistCount := len(wishlistItems)
+
 	for _, items := range wishlistItems {
 
 		response = append(response, map[string]interface{}{
@@ -40,9 +42,10 @@ func GetWishlist(c *gin.Context) {
 			"image_url":   items.Product.Images,
 			"reviews":     items.Product.Reviews,
 		})
+
 	}
 
-	helpers.SendResponse(c, http.StatusOK, "Wishlist fetched successfully", nil, gin.H{"data": response})
+	helpers.SendResponse(c, http.StatusOK, "Wishlist fetched successfully", nil, gin.H{"data": response, "wishlist Count": wishlistCount})
 
 }
 

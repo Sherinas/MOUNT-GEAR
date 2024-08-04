@@ -25,8 +25,7 @@ func GetUserProfile(c *gin.Context) {
 	var wallets models.Wallet
 
 	if err := models.DB.Where("user_id=?", userID).First(&wallets).Error; err != nil { // change to function
-		helpers.SendResponse(c, http.StatusNotFound, "User not found", nil)
-		return
+
 	}
 
 	if err := models.DB.Preload("Addresses").First(&user, userID).Error; err != nil { // change to function
@@ -183,7 +182,7 @@ func GetAddAddress(c *gin.Context) {
 		helpers.SendResponse(c, http.StatusOK, "Addresses retrieved successfully", nil)
 		return
 	}
-	helpers.SendResponse(c, http.StatusOK, "No addresses found", nil, gin.H{"addresses": addresses})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"addresses": addresses})
 
 }
 

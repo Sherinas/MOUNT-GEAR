@@ -20,7 +20,7 @@ func ListProducts(ctx *gin.Context) {
 	var products []models.Product
 
 	if err := models.FetchData(models.DB.Preload("Category"), &products); err != nil {
-		helpers.SendResponse(ctx, http.StatusInternalServerError, "could not fetch categories", nil)
+		helpers.SendResponse(ctx, http.StatusInternalServerError, "could not fetch products", nil)
 	}
 	helpers.SendResponse(ctx, http.StatusOK, "", nil, gin.H{"products": products})
 
@@ -185,7 +185,7 @@ func ToggleProductStatus(ctx *gin.Context) { // check the code
 		helpers.SendResponse(ctx, http.StatusNotFound, "Failed to update product status", nil)
 	}
 
-	helpers.SendResponse(ctx, http.StatusNotFound, "Product status updated successfully", nil, gin.H{"product": product})
+	helpers.SendResponse(ctx, http.StatusOK, "Product status updated successfully", nil, gin.H{"product": product})
 
 }
 
@@ -255,7 +255,7 @@ func UpdateProduct(ctx *gin.Context) {
 				helpers.SendResponse(ctx, http.StatusBadRequest, "Discount percentage must be between 0 and", nil)
 				return
 			}
-			updates["discount_price"] = discountFloat
+			updates["discount"] = discountFloat
 		}
 	}
 
