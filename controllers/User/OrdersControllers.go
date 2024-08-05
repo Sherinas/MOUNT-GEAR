@@ -235,6 +235,11 @@ func GetOrderDetails(c *gin.Context) {
 	if payment.Status == "created" {
 
 		payStatus = "Pending"
+	} else if payment.Status == "Failed" {
+		payStatus = "Failed"
+
+	} else if payment.Status == "Success" {
+		payStatus = "Success"
 	}
 
 	//finalAmount := totalAmountWithoutDiscount - totalDiscount

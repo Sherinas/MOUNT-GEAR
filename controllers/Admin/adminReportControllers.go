@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jung-kurt/gofpdf"
+	"github.com/xuri/excelize/v2"
 )
 
 type SalesReportItem struct {
@@ -27,6 +28,8 @@ type SalesReportItem struct {
 
 func SalesReport(c *gin.Context) {
 	filterData := c.Query("filter")
+
+	fileFormat := c.PostForm("file_format")
 
 	var startTime, endTime time.Time
 	var err error
@@ -111,23 +114,44 @@ func SalesReport(c *gin.Context) {
 		report = append(report, reportItem)
 	}
 
-	pdfPath, err := generatePDF(report)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating PDF: " + err.Error()})
-		return
+	if fileFormat == "pdf" {
+		pdfPath, err := generatePDF(report)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating PDF: " + err.Error()})
+			return
+		}
+
+		c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filepath.Base(pdfPath)))
+		c.Writer.Header().Set("Content-Type", "application/pdf")
+
+		c.File(pdfPath)
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "PDF generated successfully",
+		})
+
+	} else {
+
+		pdfPath, err := generateExcel(report)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating Excel: " + err.Error()})
+			return
+		}
+
+		c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filepath.Base(pdfPath)))
+		c.Writer.Header().Set("Content-Type", "application/excel")
+
+		c.File(pdfPath)
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Excel generated successfully",
+		})
+
 	}
-
-	c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filepath.Base(pdfPath)))
-	c.Writer.Header().Set("Content-Type", "application/pdf")
-
-	c.File(pdfPath)
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "PDF generated successfully",
-	})
 
 }
 
+// ......................................................................gerarate pdf...............................
 func generatePDF(report []SalesReportItem) (string, error) {
 
 	pdfPath := filepath.Join("C:/Users/Sherinas/Downloads/", "sales_report_"+time.Now().Format("20060102150405")+".pdf")
@@ -178,6 +202,55 @@ func generatePDF(report []SalesReportItem) (string, error) {
 	return pdfPath, nil
 }
 
+// ...........................................grnarate Excel.......................................................................
+func generateExcel(report []SalesReportItem) (string, error) {
+	excelPath := filepath.Join("C:/Users/Sherinas/Downloads/", "sales_report_"+time.Now().Format("20060102150405")+".xlsx")
+
+	f := excelize.NewFile()
+	sheet := "Sheet1"
+
+	// Set headers
+	headers := []string{"Order ID", "Customer Name", "Payment Method", "Final Amount", "Status", "Order Date"}
+	for col, header := range headers {
+		cell := fmt.Sprintf("%c1", 'A'+col)
+		f.SetCellValue(sheet, cell, header)
+	}
+
+	// Set data
+	var totalDiscountAmount float64
+	var totalAmount float64
+	for row, item := range report {
+		f.SetCellValue(sheet, fmt.Sprintf("A%d", row+2), item.OrderID)
+		f.SetCellValue(sheet, fmt.Sprintf("B%d", row+2), item.CustomerName)
+		f.SetCellValue(sheet, fmt.Sprintf("C%d", row+2), item.PaymentMethod)
+		f.SetCellValue(sheet, fmt.Sprintf("D%d", row+2), item.FinalAmount)
+		f.SetCellValue(sheet, fmt.Sprintf("E%d", row+2), item.Status)
+		f.SetCellValue(sheet, fmt.Sprintf("F%d", row+2), item.Date)
+
+		totalAmount += item.FinalAmount
+		totalDiscountAmount += item.CouponDiscount
+	}
+
+	// Set summary
+	lastRow := len(report) + 3
+	f.SetCellValue(sheet, fmt.Sprintf("A%d", lastRow), "Total Sales Count:")
+	f.SetCellValue(sheet, fmt.Sprintf("B%d", lastRow), len(report))
+
+	f.SetCellValue(sheet, fmt.Sprintf("A%d", lastRow+1), "Total Amount:")
+	f.SetCellValue(sheet, fmt.Sprintf("B%d", lastRow+1), totalAmount)
+
+	// f.SetCellValue(sheet, fmt.Sprintf("A%d", lastRow+2), "Total Coupon Discount:")
+	// f.SetCellValue(sheet, fmt.Sprintf("B%d", lastRow+2), totalDiscountAmount)
+
+	// Save the file
+	if err := f.SaveAs(excelPath); err != nil {
+		return "", err
+	}
+
+	return excelPath, nil
+}
+
+// ..................................................................................................................
 func GetSalesReport(c *gin.Context) {
 	filterData := c.Query("filter")
 
