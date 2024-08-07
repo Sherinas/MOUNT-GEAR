@@ -62,11 +62,12 @@ func AdminRoutes(router *gin.Engine) {
 		admin.GET("/offers/:offerID/edit", controllers.GetEditOfferForm)
 		admin.PUT("/offers/:offerID", controllers.UpdateOffer)
 		admin.DELETE("/offers/:offerID", controllers.DeleteOffer)
-		admin.GET("/logout", controllers.LogoutAdmin)
 
 		//reports
 		admin.GET("/reports", controllers.GetSalesReport)
 		admin.POST("/reports", controllers.SalesReport)
+
+		admin.GET("/logout", controllers.LogoutAdmin)
 
 	}
 

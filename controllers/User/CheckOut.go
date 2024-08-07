@@ -209,7 +209,7 @@ func Checkout(c *gin.Context) {
 	}
 
 	var address models.Address
-
+	fmt.Println(Code)
 	if addressID != 0 {
 
 		if err := tx.Where("id = ? AND user_id = ?", addressID, userID).First(&address).Error; err != nil {

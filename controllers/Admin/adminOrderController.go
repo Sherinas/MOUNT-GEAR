@@ -138,7 +138,7 @@ func OrderDetails(c *gin.Context) {
 		totalQuantity += item.Quantity
 	}
 
-	finalAmount := totalAmountWithoutDiscount - totalDiscount
+	// finalAmount := totalAmountWithoutDiscount - totalDiscount
 
 	var paymentStatus string
 	if order.PaymentMethod == "Online" || order.PaymentStatus {
@@ -147,38 +147,46 @@ func OrderDetails(c *gin.Context) {
 		paymentStatus = "Pending"
 	}
 
-	response := struct {
-		OrderID            uint      `json:"order_id"`
-		Username           string    `json:"username"`
-		Email              string    `json:"email"`
-		Phone              string    `json:"phone"`
-		Address            string    `json:"address"`
-		TotalAmount        float64   `json:"total_amount"`
-		TotalDiscount      float64   `json:"total_discount"`
-		FinalAmount        float64   `json:"final_amount"`
-		PaymentMethod      string    `json:"payment_method"`
-		Status             string    `json:"status"`
-		CancellationReason string    `json:"cancellationReason"`
-		ReturenReson       string    `json:"returnReason"`
-		CreatedAt          time.Time `json:"created_at"`
-		TotalQuantity      int       `json:"total_quantity"`
-	}{
-		OrderID:            order.ID,
-		Username:           user.Name,
-		Email:              user.Email,
-		Phone:              address.AddressPhone,
-		Address:            fullAddress,
-		TotalAmount:        totalAmountWithoutDiscount,
-		TotalDiscount:      totalDiscount,
-		FinalAmount:        finalAmount,
-		PaymentMethod:      order.PaymentMethod,
-		Status:             order.Status,
-		CancellationReason: order.CancellationReason,
-		ReturenReson:       order.ReturnReason,
+	var payment models.Payment
 
-		CreatedAt:     order.CreatedAt,
-		TotalQuantity: totalQuantity,
+	if err := models.DB.Where("order_id=?", order.PaymentID).Find(&payment).Error; err != nil {
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch TransationID", nil)
 	}
+
+	response := struct {
+		OrderID         uint      `json:"order_id"`
+		Username        string    `json:"username"`
+		Email           string    `json:"email"`
+		Phone           string    `json:"phone"`
+		Address         string    `json:"address"`
+		TotalAmount     float64   `json:"total_amount"`
+		TotalDiscount   float64   `json:"total_discount"`
+		FinalAmount     float64   `json:"final_amount"`
+		PaymentMethod   string    `json:"payment_method"`
+		Status          string    `json:"status"`
+		CreatedAt       time.Time `json:"created_at"`
+		TotalQuantity   int       `json:"total_quantity"`
+		Offer_discount  float64   `json:"offer_discount"`
+		Coupon_discount float64   `json:"coupon_discount"`
+		TransationID    string    `json:"transation_id"`
+	}{
+		OrderID:         order.ID,
+		Username:        user.Name,
+		Email:           user.Email,
+		Phone:           address.AddressPhone,
+		Address:         fullAddress,
+		TotalAmount:     order.TotalAmount,
+		Offer_discount:  order.OfferDicount,
+		Coupon_discount: order.CouponDiscount,
+		TotalDiscount:   order.TotalDiscount,
+		FinalAmount:     order.FinalAmount,
+		PaymentMethod:   order.PaymentMethod,
+		TransationID:    payment.TransactionID,
+		Status:          order.Status,
+		CreatedAt:       order.CreatedAt,
+		TotalQuantity:   totalQuantity,
+	}
+
 	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"order": response, "Products": products, "Payment Status": paymentStatus})
 }
 

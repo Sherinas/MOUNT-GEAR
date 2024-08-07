@@ -55,6 +55,14 @@ func CreateCoupon(c *gin.Context) {
 	}
 	coupon.ValidFrom = startDate
 
+	currentDate := time.Now().Truncate(24 * time.Hour)
+
+	// Validate start date is not in the past
+	if startDate.Before(currentDate) {
+		helpers.SendResponse(c, http.StatusBadRequest, "Start date cannot be in the past", nil)
+		return
+	}
+
 	endDate, err := time.Parse("2006-01-02", validTo)
 	if err != nil {
 		helpers.SendResponse(c, http.StatusBadRequest, "Invalid end date format", nil)
@@ -62,6 +70,11 @@ func CreateCoupon(c *gin.Context) {
 	}
 	coupon.ValidTo = endDate
 
+	// Validate end date is not in the past
+	if endDate.Before(currentDate) {
+		helpers.SendResponse(c, http.StatusBadRequest, "End date cannot be in the past", nil)
+		return
+	}
 	if endDate.Before(startDate) {
 		helpers.SendResponse(c, http.StatusBadRequest, "End date must be after start date", nil)
 		return
