@@ -64,21 +64,21 @@ func RazorpayPayment(c *gin.Context) {
 		Status:        "Success",
 	}
 
-	log.Printf("%v", payment.TransactionID)
-	if err := models.DB.Model(&models.Payment{}).Where("order_id = ?", response["razorpay_order_id"]).Updates(&payment).Error; err != nil {
+	if err := models.DB.Model(&models.Order{}).
+		Where("payment_id = ?", response["razorpay_order_id"]).
+		Update("payment_status", true).Error; err != nil {
+		log.Printf("Error updating order payment status: %v", err)
 		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update payment status", nil)
-
 		return
 	}
 
-	if payment.Status == "Success" {
-		if err := models.DB.Model(&models.Order{}).
-			Where("payment_id = ?", response["order_id"]).
-			Update("payment_status", true).Error; err != nil {
+	log.Printf("%v", payment.TransactionID)
 
-			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update payment status", nil)
-			return
-		}
+	if err := models.DB.Model(&models.Payment{}).Where("order_id = ?", response["razorpay_order_id"]).Updates(&payment).Error; err != nil {
+
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update payment status", nil)
+
+		return
 	}
 
 	helpers.SendResponse(c, http.StatusOK, "Payment response received successfully", nil)

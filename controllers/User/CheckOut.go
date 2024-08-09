@@ -634,7 +634,7 @@ func RetryPayment(c *gin.Context) {
 		return
 	}
 
-	if order.PaymentMethod != "Online" && order.Status != "Pending" {
+	if order.PaymentMethod != "Online" || order.Status != "Pending" {
 
 		helpers.SendResponse(c, http.StatusBadRequest, "Not Online payment or Not pending Payment", nil)
 		return

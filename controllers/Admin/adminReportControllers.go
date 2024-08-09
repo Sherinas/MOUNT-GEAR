@@ -66,20 +66,14 @@ func SalesReport(c *gin.Context) {
 	}
 
 	var orders []models.Order
-	err = models.DB.Where("created_at BETWEEN ? AND ?", startTime, endTime).Where("status = ?", "Delivered").
+	err = models.DB.Where("created_at BETWEEN ? AND ?", startTime, endTime).Where("status = ?", "Delivered").Order("created_at").
 		Select("id", "user_id", "final_amount", "payment_method", "coupon_discount", "status", "created_at").
 		Find(&orders).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching orders: " + err.Error()})
 		return
 	}
-	// err = models.DB.Where("created_at BETWEEN ? AND ?", startTime, endTime).Where("status = ? OR (status = ? AND payment_method = ? AND payment_status = ?)", "Delivered", "Pending", "Online", true).
-	// 	Select("id", "user_id", "final_amount", "payment_method", "coupon_discount", "status", "created_at").
-	// 	Find(&orders).Error
-	// if err != nil {
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching orders: " + err.Error()})
-	// 	return
-	// }
+
 	var report []SalesReportItem
 	for _, order := range orders {
 		var user models.User
@@ -90,7 +84,7 @@ func SalesReport(c *gin.Context) {
 		}
 
 		var items []models.OrderItem
-		if err := models.DB.Where("order_id = ?", order.ID).Find(&items).Error; err != nil {
+		if err := models.DB.Where("order_id = ?", order.ID).Order("updated_at desc").Find(&items).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching order items: " + err.Error()})
 			return
 		}
@@ -239,9 +233,6 @@ func generateExcel(report []SalesReportItem) (string, error) {
 	f.SetCellValue(sheet, fmt.Sprintf("A%d", lastRow+1), "Total Amount:")
 	f.SetCellValue(sheet, fmt.Sprintf("B%d", lastRow+1), totalAmount)
 
-	// f.SetCellValue(sheet, fmt.Sprintf("A%d", lastRow+2), "Total Coupon Discount:")
-	// f.SetCellValue(sheet, fmt.Sprintf("B%d", lastRow+2), totalDiscountAmount)
-
 	// Save the file
 	if err := f.SaveAs(excelPath); err != nil {
 		return "", err
@@ -291,7 +282,7 @@ func GetSalesReport(c *gin.Context) {
 
 	var orders []models.Order
 	err = models.DB.Where("created_at BETWEEN ? AND ?", startTime, endTime).Where("status = ?", "Delivered").
-		Select("id", "user_id", "final_amount", "payment_method", "coupon_discount", "status", "created_at").Order("created_at DESC").
+		Select("id", "user_id", "final_amount", "payment_method", "coupon_discount", "status", "created_at").Order("updated_at DESC").
 		Find(&orders).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching orders: " + err.Error()})
