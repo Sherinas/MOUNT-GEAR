@@ -344,8 +344,12 @@ func Checkout(c *gin.Context) {
 
 	order.TotalDiscount = order.OfferDicount + order.CouponDiscount
 
+	if order.FinalAmount < 1000 && order.PaymentMethod == "COD" {
+		helpers.SendResponse(c, http.StatusBadRequest, "Cash on delivery is not allowed for orders below 1000", nil)
+		return
+	}
 	//.............................................................................................payment code
-	fmt.Println("working")
+
 	if paymentMethod == "Online" {
 
 		if err := tx.Create(&order).Error; err != nil {
@@ -600,82 +604,93 @@ func Checkout(c *gin.Context) {
 
 }
 
-//..................................................................................
+//...........................................Retry payment.......................................
 
-// 	if err := tx.Create(&order).Error; err != nil {
-// 		tx.Rollback()
-// 		c.JSON(http.StatusInternalServerError, gin.H{
-// 			"Status":      "error",
-// 			"Status code": "500",
-// 			"error":       "Failed to create order"})
-// 		return
-// 	}
+func RetryPayment(c *gin.Context) {
 
-// 	for i := range orderItems {
-// 		orderItems[i].OrderID = order.ID
-// 	}
+	userID, exists := c.Get("userID")
+	if !exists {
 
-// 	if err := tx.Create(&orderItems).Error; err != nil {
-// 		tx.Rollback()
-// 		c.JSON(http.StatusInternalServerError, gin.H{
-// 			"Status":      "error",
-// 			"Status code": "500",
-// 			"error":       "Failed to create order items"})
-// 		return
-// 	}
+		helpers.SendResponse(c, http.StatusUnauthorized, "User Unauthrized", nil)
+		return
+	}
 
-// 	// Clear the cart
-// 	if err := tx.Delete(&cart.CartItems).Error; err != nil {
-// 		tx.Rollback()
-// 		c.JSON(http.StatusInternalServerError, gin.H{
-// 			"Status":      "error",
-// 			"Status code": "500",
-// 			"error":       "Failed to clear cart"})
-// 		return
-// 	}
+	var order models.Order
 
-// 	// coupon Usage
+	orderID := c.Param("order_id")
 
-// 	if couponDiscount > 0 {
-// 		var couponUsage models.CouponUsage
-// 		if err := tx.Where("user_id = ? AND coupon_id = ?", userID, coupon.ID).First(&couponUsage).Error; err != nil {
-// 			tx.Rollback()
-// 			c.JSON(http.StatusInternalServerError, gin.H{
-// 				"Status":      "error",
-// 				"Status code": "500",
-// 				"error":       "Failed to fetch coupon usage"})
-// 			return
-// 		}
+	log.Printf("%v", orderID)
 
-// 		if err := tx.Model(&couponUsage).Update("order_id", order.ID).Error; err != nil {
-// 			tx.Rollback()
-// 			c.JSON(http.StatusInternalServerError, gin.H{
-// 				"Status":      "error",
-// 				"Status code": "500",
-// 				"error":       "Failed to update coupon usage"})
-// 			return
-// 		}
-// 	}
-// 	// Commit the transaction
-// 	if err := tx.Commit().Error; err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{
-// 			"Status": "error",
-// 			"error":  "Failed to complete checkout"})
-// 		return
-// 	}
+	if orderID == "" {
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid order ID", nil)
+		return
+	}
 
-// 	c.JSON(http.StatusOK, gin.H{
-// 		"Status code":     "200",
-// 		"Status":          "success",
-// 		"message":         "Order placed successfully",
-// 		"order_id":        order.ID,
-// 		"total":           order.TotalAmount,
-// 		"offer_discount":  order.OfferDicount,
-// 		"coupon_discount": order.CouponDiscount,
-// 		"final_amount":    order.FinalAmount,
-// 		"status":          order.Status,
-// 		"address_id":      order.AddressID,
-// 		"coupon_applied":  couponDiscount > 0,
-// 	})
+	tx := models.DB.Begin()
 
-// }
+	if err := models.DB.Where("user_id=? AND id=?", userID, orderID).First(&order).Error; err != nil {
+
+		helpers.SendResponse(c, http.StatusBadRequest, "order not found", nil)
+		return
+	}
+
+	if order.PaymentMethod != "Online" && order.Status != "Pending" {
+
+		helpers.SendResponse(c, http.StatusBadRequest, "Not Online payment or Not pending Payment", nil)
+		return
+	}
+
+	if !order.PaymentStatus {
+		// Create a new payment order with Razorpay
+		razorpayClient := razorpay.NewClient(os.Getenv("KEY_ID"), os.Getenv("KEY_SECRET"))
+		paymentOrder, err := razorpayClient.Order.Create(map[string]interface{}{
+			"amount":   order.FinalAmount * 100,
+			"currency": "INR",
+			"receipt":  "77890039",
+		}, nil)
+		if err != nil {
+			// If there's an error creating the payment order, send an internal server error response
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create payment order", nil)
+			return
+		}
+
+		// Create a new payment record
+		payment := models.Payment{
+			OrderID:       paymentOrder["id"].(string),
+			Amount:        order.FinalAmount,
+			Status:        paymentOrder["status"].(string),
+			TransactionID: "",
+		}
+
+		if err := tx.Model(&models.Payment{}).Where("order_id=?", order.PaymentID).Updates(payment).Error; err != nil {
+			tx.Rollback()
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update payment record", nil)
+			return
+		}
+
+		if err := tx.Model(&models.Order{}).Where("id = ?", order.ID).Update("payment_id", paymentOrder["id"].(string)).Error; err != nil {
+			tx.Rollback()
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update order payment id", nil)
+			return
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to commit transaction", nil)
+			return
+		}
+
+		helpers.SendResponse(c, http.StatusOK, "Order placed successfully", nil, gin.H{
+			"order_id":        order.ID,
+			"total":           order.TotalAmount,
+			"offer_discount":  order.OfferDicount,
+			"coupon_discount": order.CouponDiscount,
+			"final_amount":    order.FinalAmount,
+			"status":          order.Status,
+			"address_id":      order.AddressID,
+			"payment_ID":      payment.OrderID,
+		})
+	} else {
+
+		helpers.SendResponse(c, http.StatusBadRequest, "payment already completed", nil)
+	}
+}

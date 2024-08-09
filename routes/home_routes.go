@@ -31,6 +31,7 @@ func HomeRoutes(router *gin.Engine) {
 		auth.GET("/shop/check-out", controllers.GetCheckOut)
 		auth.POST("/shop/check-out", controllers.Checkout)
 		auth.POST("/shop/check-out/edit-Address/:id", controllers.CheckOutEditAddress)
+		auth.POST("/shop/check-out/retry-Payment/:order_id", controllers.RetryPayment)
 
 		// Order routes
 		auth.GET("/shop/order", controllers.GetAllOrders)
@@ -60,6 +61,8 @@ func HomeRoutes(router *gin.Engine) {
 		// Change password
 		auth.GET("/profile/change-password", controllers.GetChangePassword)
 		auth.POST("/profile/change-password", controllers.ChangePassword)
+
+		//Payment
 		router.GET("/home/payment", func(c *gin.Context) {
 			c.HTML(200, "payment.html", nil)
 		})

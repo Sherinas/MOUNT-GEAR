@@ -805,7 +805,6 @@ func CancelOrderItem(c *gin.Context) {
 //...........................................invoice...................................................................
 
 func Invoice(c *gin.Context) {
-
 	userID, exists := c.Get("userID")
 	if !exists {
 		helpers.SendResponse(c, http.StatusUnauthorized, "User not authenticated", nil)
@@ -816,44 +815,47 @@ func Invoice(c *gin.Context) {
 
 	var order models.Order
 
+	// Fetch the order and its items
 	if err := models.DB.Preload("Items").First(&order, orderID).Error; err != nil {
-		helpers.SendResponse(c, http.StatusNotFound, "Could not fetch order", nil)
+		if err == gorm.ErrRecordNotFound {
+			helpers.SendResponse(c, http.StatusNotFound, "Order not found", nil)
+		} else {
+			helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch order", nil)
+		}
 		return
 	}
 
 	if order.UserID != userID {
 		helpers.SendResponse(c, http.StatusUnauthorized, "You are not authorized to view this order", nil)
+		return
+	}
+
+	if order.Status == "pending" {
+		helpers.SendResponse(c, http.StatusBadRequest, "Invoice cannot be generated for a pending order", nil)
+		return
 	}
 
 	var user models.User
 	if err := models.DB.First(&user, order.UserID).Error; err != nil {
-		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch user", nil)
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch user information", nil)
 		return
 	}
 
 	var address models.Address
 	if err := models.DB.First(&address, order.AddressID).Error; err != nil {
-		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch address", nil)
+		helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch address information", nil)
 		return
 	}
 
-	fullAddress := fmt.Sprintf("%s, %s, %s, %s, %s, %s",
-		address.AddressLine1,
-		address.AddressLine2,
-		address.City,
-		address.State,
-		address.Zipcode,
-		address.Country,
-	)
-
-	var products []gin.H
+	// var products []gin.H
 	var totalQuantity int
 	var totalDiscount, totalAmountWithoutDiscount float64
 
 	for _, item := range order.Items {
 		var product models.Product
-
-		if err := models.DB.First(&product, item.ProductID).Error; err != nil {
+		if err := models.DB.Preload("Images", func(db *gorm.DB) *gorm.DB {
+			return db.Limit(1) // Fetch only one image per product if needed
+		}).First(&product, item.ProductID).Error; err != nil {
 			helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch product", nil)
 			return
 		}
@@ -864,176 +866,110 @@ func Invoice(c *gin.Context) {
 		totalAmountWithoutDiscount += itemTotal
 		totalDiscount += itemDiscount
 
-		productInfo := gin.H{
-			"ID":       product.ID,
-			"Name":     product.Name,
-			"Price":    product.Price,
-			"Discount": product.Discount,
-			"Quantity": item.Quantity,
-		}
-		products = append(products, productInfo)
+		// products = append(products, gin.H{
+		// 	"ID":       product.ID,
+		// 	"Name":     product.Name,
+		// 	"Price":    product.Price,
+		// 	"Discount": product.Discount,
+		// 	"Quantity": item.Quantity,
+		// 	"Total":    itemTotal,
+		// })
 		totalQuantity += item.Quantity
 	}
 
-	var payment models.Payment
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
 
-	if order.PaymentMethod == "Online" {
-		if err := models.DB.Where("order_id = ?", order.PaymentID).First(&payment).Error; err != nil {
-			helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch payment", nil)
+	pdf.SetFont("Arial", "B", 16)
+	pdf.Cell(40, 10, "Invoice")
+	pdf.Ln(50)
+
+	pdf.SetXY(140, 35)
+	pdf.SetXY(10, 20)
+	pdf.CellFormat(160, 60, "MOUND GEAR", "", 0, "R", false, 0, "")
+	pdf.Ln(5)
+
+	pdf.SetFont("Arial", "", 12)
+	pdf.Cell(40, 10, "Invoice No: INV-"+orderID)
+	pdf.Ln(5)
+	pdf.Cell(40, 10, "Date: "+order.UpdatedAt.Format("2006-01-02"))
+	pdf.Ln(5)
+
+	pdf.Cell(40, 10, "Name: "+user.Name)
+	pdf.Ln(5)
+	pdf.Cell(40, 10, "Email: "+user.Email)
+	pdf.Ln(10)
+	pdf.Cell(40, 10, "Number: "+address.AddressPhone)
+	pdf.Ln(10)
+
+	pdf.Cell(40, 10, "Billing Address:")
+	pdf.Ln(5)
+	pdf.Cell(40, 10, address.AddressLine1)
+	pdf.Ln(5)
+	pdf.Cell(40, 10, address.AddressLine2)
+	pdf.Ln(5)
+	pdf.Cell(40, 10, address.City)
+	pdf.Ln(5)
+	pdf.Cell(40, 10, address.State+", "+address.Country+" "+address.Zipcode)
+	pdf.Ln(10)
+
+	pdf.SetFont("Arial", "B", 12)
+	pdf.SetFillColor(240, 240, 240)
+	pdf.CellFormat(70, 10, "Product Name", "1", 0, "C", true, 0, "")
+	pdf.CellFormat(40, 10, "Quantity", "1", 0, "C", true, 0, "")
+	pdf.CellFormat(40, 10, "Unit Price", "1", 0, "C", true, 0, "")
+	pdf.CellFormat(40, 10, "Total", "1", 0, "C", true, 0, "")
+	pdf.Ln(10)
+
+	for _, item := range order.Items {
+		var product models.Product
+		if err := models.DB.First(&product, item.ProductID).Error; err != nil {
+			helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch product", nil)
 			return
 		}
+
+		itemTotal := product.Price * float64(item.Quantity)
+		pdf.SetFont("Arial", "", 12)
+		pdf.CellFormat(70, 10, product.Name, "1", 0, "", false, 0, "")
+		pdf.CellFormat(40, 10, strconv.Itoa(item.Quantity), "1", 0, "C", false, 0, "")
+		pdf.CellFormat(40, 10, fmt.Sprintf("%.2f", product.Price), "1", 0, "C", false, 0, "")
+		pdf.CellFormat(40, 10, fmt.Sprintf("%.2f", itemTotal), "1", 0, "C", false, 0, "")
+		pdf.Ln(10)
 	}
 
-	response := struct {
-		OrderID         uint      `json:"order_id"`
-		Username        string    `json:"username"`
-		Email           string    `json:"email"`
-		Phone           string    `json:"phone"`
-		Address         string    `json:"address"`
-		TotalAmount     float64   `json:"total_amount"`
-		TotalDiscount   float64   `json:"total_discount"`
-		FinalAmount     float64   `json:"final_amount"`
-		PaymentMethod   string    `json:"payment_method"`
-		CreatedAt       time.Time `json:"created_at"`
-		TotalQuantity   int       `json:"total_quantity"`
-		Offer_discount  float64   `json:"offer_discount"`
-		Coupon_discount float64   `json:"coupon_discount"`
-	}{
-		OrderID:         order.ID,
-		Username:        user.Name,
-		Email:           user.Email,
-		Phone:           address.AddressPhone,
-		Address:         fullAddress,
-		TotalAmount:     order.TotalAmount,
-		Offer_discount:  order.OfferDicount,
-		Coupon_discount: order.CouponDiscount,
-		TotalDiscount:   order.TotalDiscount,
-		FinalAmount:     order.FinalAmount,
-		PaymentMethod:   order.PaymentMethod,
-		CreatedAt:       order.CreatedAt,
-		TotalQuantity:   totalQuantity,
-	}
+	pdf.Ln(5)
+	pdf.SetFont("Arial", "B", 12)
 
-	// helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"order": response, "Products": products})
+	pdf.CellFormat(150, 10, "Coupon Discount:", "", 0, "R", false, 0, "")
+	pdf.Cell(40, 10, fmt.Sprintf("%.2f", order.CouponDiscount))
+	pdf.Ln(5)
 
-	pdfPath, err := generatePDF(response)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating PDF: " + err.Error()})
+	pdf.CellFormat(150, 10, "Offer Discount:", "", 0, "R", false, 0, "")
+	pdf.Cell(40, 10, fmt.Sprintf("-%.2f", order.OfferDicount))
+	pdf.Ln(5)
+
+	pdf.CellFormat(150, 10, "Total Discount:", "", 0, "R", false, 0, "")
+	pdf.Cell(40, 10, fmt.Sprintf("%.2f", order.TotalDiscount))
+	pdf.Ln(5)
+
+	pdf.CellFormat(150, 10, "Delivery Charge:", "", 0, "R", false, 0, "")
+	// pdf.Cell(40, 10, fmt.Sprintf("%.2f", order.DeliveryCharge))
+	pdf.Ln(5)
+
+	pdf.CellFormat(150, 10, "Grand Total:", "", 0, "R", false, 0, "")
+	pdf.Cell(40, 10, fmt.Sprintf("%.2f", order.FinalAmount))
+
+	pdfPath := filepath.Join("C:/Users/Sherinas/Downloads", "sales_report_"+time.Now().Format("20060102150405")+".pdf")
+	if err := pdf.OutputFileAndClose(pdfPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate PDF file: " + err.Error()})
 		return
 	}
 
-	c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filepath.Base(pdfPath)))
+	c.Writer.Header().Set("Content-Disposition", "attachment; filename=invoice.pdf")
 	c.Writer.Header().Set("Content-Type", "application/pdf")
-
 	c.File(pdfPath)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "PDF generated successfully",
+		"message": "PDF file generated and sent successfully",
 	})
-}
-
-// func generatePDF(res) (string, error) {
-
-// 	pdfPath := filepath.Join("C:/Users/Sherinas/Downloads/", "sales_report_"+time.Now().Format("20060102150405")+".pdf")
-
-// 	pdf := gofpdf.New("P", "mm", "A4", "")
-// 	pdf.AddPage()
-// 	pdf.SetFont("Arial", "B", 16)
-// 	pdf.Cell(0, 10, "Sales Report")
-// 	pdf.Ln(15)
-
-// 	pdf.SetFont("Arial", "B", 10)
-// 	headers := []string{"Order ID", "Customer Name", "Payment Method", "Final Amount", "Status", "Order Date"}
-// 	for _, header := range headers {
-// 		pdf.Cell(32, 10, header)
-// 	}
-// 	pdf.Ln(-1)
-
-// 	pdf.SetFont("Arial", "", 10)
-// 	var totalDiscountAmount float64
-// 	var totalAmount float64
-// 	for _, item := range report {
-// 		pdf.Cell(32, 8, strconv.Itoa(int(item.OrderID)))
-// 		pdf.Cell(32, 8, item.CustomerName)
-// 		pdf.Cell(32, 8, item.PaymentMethod)
-// 		pdf.Cell(32, 8, strconv.FormatFloat(item.FinalAmount, 'f', 2, 64))
-// 		pdf.Cell(32, 8, item.Status)
-// 		pdf.Cell(32, 8, item.Date)
-// 		pdf.Ln(-1)
-// 		totalAmount += item.FinalAmount
-// 		totalDiscountAmount += item.CouponDiscount //coupon descount
-
-// 	}
-
-// 	pdf.Ln(10)
-// 	pdf.SetFont("Arial", "B", 12)
-// 	pdf.Cell(0, 10, fmt.Sprintf("Total Sales Count: %d", len(report)))
-// 	pdf.Ln(-1)
-// 	pdf.Cell(0, 10, fmt.Sprintf("Total Amount: %.2f", totalAmount))
-// 	pdf.Ln(-1)
-// 	// pdf.Cell(0, 10, fmt.Sprintf("Total Coupon Dicount : %.2f", totalDiscountAmount))
-
-// 	//	tempFilePath := "C:/Users/Sherinas/Downloads/sales_report.pdf"
-// 	err := pdf.OutputFileAndClose(pdfPath)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-//		return pdfPath, nil
-//	}
-func generatePDF(res interface{}) (string, error) {
-	response := res.(struct {
-		OrderID         uint
-		Username        string
-		Email           string
-		Phone           string
-		Address         string
-		TotalAmount     float64
-		TotalDiscount   float64
-		FinalAmount     float64
-		PaymentMethod   string
-		CreatedAt       time.Time
-		TotalQuantity   int
-		Offer_discount  float64
-		Coupon_discount float64
-	})
-
-	pdfPath := filepath.Join("C:/Users/Sherinas/Downloads/", "invoice_"+time.Now().Format("20060102150405")+".pdf")
-
-	pdf := gofpdf.New("P", "mm", "A4", "")
-	pdf.AddPage()
-	pdf.SetFont("Arial", "B", 16)
-	pdf.Cell(0, 10, "Invoice")
-	pdf.Ln(15)
-
-	pdf.SetFont("Arial", "B", 12)
-	pdf.Cell(0, 10, fmt.Sprintf("Order ID: %d", response.OrderID))
-	pdf.Ln(10)
-	pdf.Cell(0, 10, fmt.Sprintf("Customer Name: %s", response.Username))
-	pdf.Ln(10)
-	pdf.Cell(0, 10, fmt.Sprintf("Email: %s", response.Email))
-	pdf.Ln(10)
-	pdf.Cell(0, 10, fmt.Sprintf("Phone: %s", response.Phone))
-	pdf.Ln(10)
-	pdf.Cell(0, 10, fmt.Sprintf("Address: %s", response.Address))
-	pdf.Ln(10)
-	pdf.Cell(0, 10, fmt.Sprintf("Total Amount: %.2f", response.TotalAmount))
-	pdf.Ln(10)
-	pdf.Cell(0, 10, fmt.Sprintf("Discount: %.2f", response.TotalDiscount))
-	pdf.Ln(10)
-	pdf.Cell(0, 10, fmt.Sprintf("Final Amount: %.2f", response.FinalAmount))
-	pdf.Ln(10)
-	pdf.Cell(0, 10, fmt.Sprintf("Payment Method: %s", response.PaymentMethod))
-	pdf.Ln(10)
-	pdf.Cell(0, 10, fmt.Sprintf("Created At: %s", response.CreatedAt.Format("2006-01-02 15:04:05")))
-	pdf.Ln(10)
-	pdf.Cell(0, 10, fmt.Sprintf("Total Quantity: %d", response.TotalQuantity))
-	pdf.Ln(10)
-
-	err := pdf.OutputFileAndClose(pdfPath)
-	if err != nil {
-		return "", err
-	}
-
-	return pdfPath, nil
 }
