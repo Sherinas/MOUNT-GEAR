@@ -316,7 +316,9 @@ func CancelOrder(c *gin.Context) {
 		}
 
 		order.Status = "Canceled"
+
 		order.CancellationReason = input.CancellationReason
+
 		if err := tx.Save(&order).Error; err != nil {
 			return err
 		}
@@ -330,7 +332,48 @@ func CancelOrder(c *gin.Context) {
 
 		}
 
-		// Update product stock (as in the previous implementation)
+		if order.PaymentStatus {
+
+			if order.PaymentMethod == "Online" || order.PaymentMethod == "Wallet" {
+				var wallet models.Wallet
+				returnAmount := order.FinalAmount - order.CouponDiscount
+
+				err := models.DB.Where("user_id = ?", order.UserID).First(&wallet).Error
+				if err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						// Wallet doesn't exist, create a new one
+						newWallet := models.Wallet{
+							UserID:  order.UserID,
+							Balance: returnAmount,
+						}
+						if err := models.DB.Create(&newWallet).Error; err != nil {
+							helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create wallet", nil)
+
+							return nil
+						}
+					} else {
+
+						helpers.SendResponse(c, http.StatusInternalServerError, "Failed to get wallet", nil)
+
+						return nil
+					}
+				} else {
+
+					if err := models.DB.Model(&wallet).Where("user_ID = ?", userID).Update("balance", gorm.Expr("balance + ?", returnAmount)).Error; err != nil {
+						helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update wallet", nil)
+
+						return nil
+					}
+				}
+
+				log.Printf("Updated wallet for user %d. Return amount: %f", order.UserID, returnAmount)
+
+			} else {
+				helpers.SendResponse(c, http.StatusBadRequest, "payment is failed or payment status is not online or wallet", nil)
+			}
+
+		}
+
 		for _, item := range order.Items {
 			if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
 				UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
@@ -372,6 +415,11 @@ func ReturnOrder(c *gin.Context) {
 	}
 
 	var order models.Order
+
+	if err := models.DB.Where("order_id=?", orderID).First(&order).Error; err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "order not found", nil)
+		return
+	}
 
 	err := models.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Preload("Items").Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error; err != nil {
@@ -556,7 +604,7 @@ func UpdateCancelOrderItem(c *gin.Context) {
 
 		return
 	}
-
+	var order models.Order
 	var input struct {
 		OrderItemID uint   `json:"order_item_id" binding:"required"`
 		Reason      string `json:"reason" binding:"required"`
@@ -566,6 +614,19 @@ func UpdateCancelOrderItem(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		helpers.SendResponse(c, http.StatusBadRequest, "Invalid input", nil)
 		return
+	}
+
+	if err := models.DB.Where("id=?", orderID).First(&order).Error; err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "order not found", nil)
+		return
+	}
+
+	if order.PaymentMethod == "Online" || order.PaymentMethod == "Wallet" {
+
+		helpers.SendResponse(c, http.StatusBadRequest, "Cannot update Online and wallet order. Please cancel the entire order instead", nil)
+
+		return
+
 	}
 
 	var couponUsage models.CouponUsage
@@ -579,7 +640,7 @@ func UpdateCancelOrderItem(c *gin.Context) {
 	}
 
 	err = models.DB.Transaction(func(tx *gorm.DB) error {
-		var order models.Order
+
 		if err := tx.Preload("Items").Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error; err != nil {
 			return err
 		}
@@ -702,6 +763,19 @@ func CancelOrderItem(c *gin.Context) {
 	}
 	var order models.Order
 	var couponUsage models.CouponUsage
+
+	if err := models.DB.Where("id=?", orderID).First(&order).Error; err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "order not found", nil)
+
+		return
+	}
+	if order.PaymentMethod == "Online" || order.PaymentMethod == "Wallet" {
+
+		helpers.SendResponse(c, http.StatusBadRequest, "Cannot remove single item . Please cancel the entire order instead", nil)
+
+		return
+
+	}
 
 	if err := models.DB.Where("order_id = ?", orderID).First(&couponUsage).Error; err == nil {
 
@@ -830,8 +904,12 @@ func Invoice(c *gin.Context) {
 		return
 	}
 
-	if order.Status == "pending" {
+	if order.Status == "Pending" {
 		helpers.SendResponse(c, http.StatusBadRequest, "Invoice cannot be generated for a pending order", nil)
+		return
+	}
+	if order.Status == "Canceled" {
+		helpers.SendResponse(c, http.StatusBadRequest, "Invoice cannot be generated for a Canceled order", nil)
 		return
 	}
 
@@ -853,9 +931,7 @@ func Invoice(c *gin.Context) {
 
 	for _, item := range order.Items {
 		var product models.Product
-		if err := models.DB.Preload("Images", func(db *gorm.DB) *gorm.DB {
-			return db.Limit(1) // Fetch only one image per product if needed
-		}).First(&product, item.ProductID).Error; err != nil {
+		if err := models.DB.First(&product, item.ProductID).Error; err != nil {
 			helpers.SendResponse(c, http.StatusInternalServerError, "Could not fetch product", nil)
 			return
 		}

@@ -97,12 +97,24 @@ func CreateOffer(c *gin.Context) {
 		return
 	}
 	input.ValidTo = endDate
-
+	currentDate := time.Now().Truncate(24 * time.Hour)
 	if endDate.Before(startDate) {
 		helpers.SendResponse(c, http.StatusBadRequest, "End date must be after start date", nil)
 		return
 	}
 
+	if startDate.Before(currentDate) {
+		helpers.SendResponse(c, http.StatusBadRequest, "Start date cannot be in the past", nil)
+		return
+	}
+	if startDate.After(currentDate) {
+		helpers.SendResponse(c, http.StatusBadRequest, "Start date cannot be in the future", nil)
+		return
+	}
+	if endDate.Before(currentDate) {
+		helpers.SendResponse(c, http.StatusBadRequest, "End date cannot be in the past", nil)
+		return
+	}
 	tx := models.DB.Begin() // start databse transaction
 
 	if offerType == "category" {
@@ -265,6 +277,7 @@ func UpdateOffer(c *gin.Context) {
 
 		return
 	}
+	currentDate := time.Now().Truncate(24 * time.Hour)
 
 	discount, err := strconv.ParseFloat(discountPercentage, 64)
 	if err != nil || discount <= 0 || discount > 100 {
@@ -290,6 +303,19 @@ func UpdateOffer(c *gin.Context) {
 	if endDate.Before(startDate) {
 		helpers.SendResponse(c, http.StatusBadRequest, "End date cannot be before start date", nil)
 
+		return
+	}
+
+	if startDate.Before(currentDate) {
+		helpers.SendResponse(c, http.StatusBadRequest, "Start date cannot be in the past", nil)
+		return
+	}
+	if startDate.After(currentDate) {
+		helpers.SendResponse(c, http.StatusBadRequest, "Start date cannot be in the future", nil)
+		return
+	}
+	if endDate.Before(currentDate) {
+		helpers.SendResponse(c, http.StatusBadRequest, "End date cannot be in the past", nil)
 		return
 	}
 

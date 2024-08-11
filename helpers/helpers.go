@@ -43,30 +43,33 @@ func UpdateExpiredOffers() error {
 	now := time.Now()
 
 	return models.DB.Transaction(func(tx *gorm.DB) error {
-		// Find expired offers
+
 		var offers []models.Offer
-		if err := tx.Where("valid_to < ? AND discount != 0", now).Find(&offers).Error; err != nil {
+		if err := tx.Where("valid_to < ? AND discount_percentage != 0", now).Find(&offers).Error; err != nil {
 			return err
 		}
 
-		// Update products for each expired offer
 		for _, offer := range offers {
-			var updateQuery *gorm.DB
+
 			if offer.OfferType == "category" {
-				updateQuery = tx.Model(&models.Product{}).Where("category_id = ?", offer.CategoryID)
+				tx.Model(&models.Product{}).Where("category_id = ?", offer.CategoryID)
+
+				if err := tx.Model(&models.Product{}).Where("category_id = ?", offer.ProductID).Update("discount", 0).Error; err != nil {
+					tx.Rollback()
+
+				}
+
 			} else {
-				updateQuery = tx.Model(&models.Product{}).Where("id = ?", offer.ProductID)
+				tx.Model(&models.Product{}).Where("id = ?", offer.ProductID)
+				if err := tx.Model(&models.Product{}).Where("id = ?", offer.ProductID).Update("discount", 0).Error; err != nil {
+					tx.Rollback()
+
+				}
 			}
 
-			if err := updateQuery.Update("discount", 0).Error; err != nil {
-				return err
-			}
 		}
 
-		if err := tx.Model(&models.Offer{}).Where("valid_to < ?", now).Update("discount", 0).Error; err != nil {
-			return err
-		}
-
+		log.Printf("%s", "offer checking done")
 		return nil
 	})
 }
