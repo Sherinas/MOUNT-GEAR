@@ -13,11 +13,3 @@ type AdminUser struct {
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }
-
-type Banner struct {
-	ID        uint      `gorm:"primaryKey"`
-	Title     string    `gorm:"size:100"`
-	ImageURL  string    `gorm:"size:255"`
-	CreatedAt time.Time `gorm:"autoCreateTime"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime"`
-}

@@ -4,6 +4,7 @@ import (
 	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -17,7 +18,7 @@ func Sorting(c *gin.Context) {
 		return
 	}
 
-	if sortBy != "product_category" && sortBy != "popular_product" && sortBy != "popular_category" {
+	if sortBy != "popular_product" && sortBy != "popular_category" {
 		helpers.SendResponse(c, http.StatusBadRequest, "Invalid sort option selected", nil)
 		return
 	}
@@ -91,4 +92,66 @@ func getPopularCategories(db *gorm.DB) ([]struct {
 		Scan(&results).Error
 
 	return results, err
+}
+
+type SalesData struct {
+	Date  string  `json:"date"`
+	Total float64 `json:"total"`
+}
+
+func Charts(c *gin.Context) {
+	filterData := c.Query("filter")
+
+	var startTime, endTime time.Time
+	var err error
+
+	// Set time range based on filter
+	switch filterData {
+	case "daily":
+		startTime = time.Now().AddDate(0, 0, -1)
+		endTime = time.Now()
+	case "weekly":
+		startTime = time.Now().AddDate(0, 0, -7)
+		endTime = time.Now()
+	case "monthly":
+		startTime = time.Now().AddDate(0, -1, 0)
+		endTime = time.Now()
+	case "yearly":
+		startTime = time.Now().AddDate(-1, 0, 0)
+		endTime = time.Now()
+	case "custom":
+		startStr := c.Query("start_date")
+		endStr := c.Query("end_date")
+		startTime, err = time.Parse("2006-01-02", startStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start date format. Use YYYY-MM-DD"})
+			return
+		}
+		endTime, err = time.Parse("2006-01-02", endStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end date format. Use YYYY-MM-DD"})
+			return
+		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter parameter"})
+		return
+	}
+
+	var salesData []SalesData
+	err = models.DB.Model(&models.Order{}).
+		Where("created_at BETWEEN ? AND ?", startTime, endTime).
+		Where("status = ?", "Delivered").
+		Select("DATE(created_at) as date, SUM(final_amount) as total").
+		Group("DATE(created_at)").
+		Order("date").
+		Find(&salesData).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching sales data: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"sales_data": salesData})
+	c.HTML(http.StatusOK, "reports,html", gin.H{})
+
 }

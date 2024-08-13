@@ -195,24 +195,9 @@ func VerifyOTP(c *gin.Context) {
 
 	if refid > 0 {
 
-		// // finding user name using with id
-		// if err := models.DB.Where("user_id=?", refid).First(&user).Error; err != nil {
-		// 	c.JSON(http.StatusInternalServerError, gin.H{
-		// 		"Status":      "error",
-		// 		"Status code": "500",
-		// 		"error":       "Error in database query",
-		// 	})
-
-		// }
-
-		// save the name to user modals
 		input.ReferredBy = user.Name
 
-		// genarate refral id for new user
-
-		walletAmount := 200
-
-		// Check if wallet exists for the user
+		walletAmount := 100
 
 		var wallet models.Wallet
 		err := models.DB.Where("user_id = ?", refid).First(&wallet).Error

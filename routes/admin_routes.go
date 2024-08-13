@@ -16,8 +16,8 @@ func AdminRoutes(router *gin.Engine) {
 
 	{
 
-		admin.GET("/dashboard", controllers.GetAdminDashboard)
 		admin.Use(middlewares.AdminAuthMiddleware())
+		admin.GET("/dashboard", controllers.GetAdminDashboard)
 		// product routes
 		admin.GET("/products", controllers.ListProducts)
 		admin.GET("/product_add", controllers.GetNewProductForm)
@@ -69,6 +69,7 @@ func AdminRoutes(router *gin.Engine) {
 
 		//sort
 		admin.GET("/sortByPopularity", controllers.Sorting)
+		admin.GET("/chart", controllers.Charts)
 
 		admin.GET("/logout", controllers.LogoutAdmin)
 

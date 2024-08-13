@@ -942,14 +942,6 @@ func Invoice(c *gin.Context) {
 		totalAmountWithoutDiscount += itemTotal
 		totalDiscount += itemDiscount
 
-		// products = append(products, gin.H{
-		// 	"ID":       product.ID,
-		// 	"Name":     product.Name,
-		// 	"Price":    product.Price,
-		// 	"Discount": product.Discount,
-		// 	"Quantity": item.Quantity,
-		// 	"Total":    itemTotal,
-		// })
 		totalQuantity += item.Quantity
 	}
 
@@ -1028,9 +1020,9 @@ func Invoice(c *gin.Context) {
 	pdf.Cell(40, 10, fmt.Sprintf("%.2f", order.TotalDiscount))
 	pdf.Ln(5)
 
-	pdf.CellFormat(150, 10, "Delivery Charge:", "", 0, "R", false, 0, "")
-	// pdf.Cell(40, 10, fmt.Sprintf("%.2f", order.DeliveryCharge))
-	pdf.Ln(5)
+	// pdf.CellFormat(150, 10, "Delivery Charge:", "", 0, "R", false, 0, "")
+	// // pdf.Cell(40, 10, fmt.Sprintf("%.2f", order.DeliveryCharge))
+	// pdf.Ln(5)
 
 	pdf.CellFormat(150, 10, "Grand Total:", "", 0, "R", false, 0, "")
 	pdf.Cell(40, 10, fmt.Sprintf("%.2f", order.FinalAmount))
@@ -1045,7 +1037,4 @@ func Invoice(c *gin.Context) {
 	c.Writer.Header().Set("Content-Type", "application/pdf")
 	c.File(pdfPath)
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "PDF file generated and sent successfully",
-	})
 }

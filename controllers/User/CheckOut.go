@@ -19,6 +19,7 @@ import (
 
 // var TempEmail = make(map[string]string)
 // var TempQty = make(map[string]int)
+// var TempAmount=make(map[string]int)
 
 //.................................................checkout page..............................................
 

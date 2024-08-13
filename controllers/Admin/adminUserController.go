@@ -8,24 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ........................list all users with details.........................................
-// func ListUsers(ctx *gin.Context) {
-// 	var users []models.User
-
-// 	type userdata struct {
-// 		ID       int    `json:"id"`
-// 		Name     string `json:"name"`
-// 		Email    string `json:"email"`
-// 		Phone    string `json:"phone"`
-// 		IsActive bool   `json:"is_active"`
-// 	}
-// 	if err := models.FetchData(models.DB, &users); err != nil {
-// 		helpers.SendResponse(ctx, http.StatusInternalServerError, "Could not fetch users", nil)
-
-// 	}
-
-//		helpers.SendResponse(ctx, http.StatusOK, "Success", nil, gin.H{"users": users})
-//	}
 func ListUsers(ctx *gin.Context) {
 	var users []models.User
 
