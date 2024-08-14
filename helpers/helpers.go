@@ -76,6 +76,7 @@ func UpdateExpiredOffers() error {
 
 func RunPeriodicTasks() {
 	ticker := time.NewTicker(6 * time.Hour)
+	log.Printf("%s", "descount Ckecking")
 	for range ticker.C {
 		if err := UpdateExpiredOffers(); err != nil {
 			log.Printf("Error updating expired offers: %v", err)

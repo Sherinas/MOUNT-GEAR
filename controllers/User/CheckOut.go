@@ -345,8 +345,8 @@ func Checkout(c *gin.Context) {
 
 	order.TotalDiscount = order.OfferDicount + order.CouponDiscount
 
-	if order.FinalAmount < 1000 && order.PaymentMethod == "COD" {
-		helpers.SendResponse(c, http.StatusBadRequest, "Cash on delivery is not allowed for orders below 1000", nil)
+	if order.FinalAmount > 1000 && order.PaymentMethod == "COD" {
+		helpers.SendResponse(c, http.StatusBadRequest, "Cash on delivery is not allowed for orders abow 1000", nil)
 		return
 	}
 	//.............................................................................................payment code
