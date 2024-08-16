@@ -123,7 +123,7 @@ func SignUp(c *gin.Context) {
 
 		HPassword := string(hashedPassword)
 		Otp := utils.GenerateOTP()
-		OtpExpiry := time.Now().Add(60 * time.Second)
+		OtpExpiry := time.Now().Add(1 * time.Minute)
 		log.Printf("gererated OTP: %v", Otp)
 
 		TempStore["name"] = Name
@@ -259,7 +259,7 @@ func ResendOTP(c *gin.Context) {
 		return
 	}
 	helpers.SendResponse(c, http.StatusOK, "OTP sent successfully", nil)
-	OtpExpiry := time.Now().Add(60 * time.Second)
+	OtpExpiry := time.Now().Add(1 * time.Minute)
 	TempStore2["time"] = OtpExpiry
 
 }
