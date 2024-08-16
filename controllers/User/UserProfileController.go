@@ -25,7 +25,7 @@ func GetUserProfile(c *gin.Context) {
 	var wallets models.Wallet
 
 	if err := models.DB.Where("user_id=?", userID).First(&wallets).Error; err != nil { // change to function
-
+		helpers.SendResponse(c, http.StatusNotFound, "User not wallet", nil)
 	}
 
 	if err := models.DB.Preload("Addresses").First(&user, userID).Error; err != nil { // change to function
@@ -33,7 +33,7 @@ func GetUserProfile(c *gin.Context) {
 
 		return
 	}
-	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"ID": user.ID, "Name": user.Name, "Email": user.Email, "Phone": user.Phone, "wallet Balance": wallets.Balance})
+	helpers.SendResponse(c, http.StatusOK, "", nil, gin.H{"ID": user.ID, "Name": user.Name, "Email": user.Email, "Phone": user.Phone, "ref-Code": user.ReferralCode, "wallet Balance": wallets.Balance})
 
 }
 

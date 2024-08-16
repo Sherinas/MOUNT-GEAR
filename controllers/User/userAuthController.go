@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -17,8 +18,16 @@ import (
 	"gorm.io/gorm"
 )
 
-var TempStore = make(map[string]string)
-var TempStore2 = make(map[string]time.Time)
+type Session struct {
+	Name           string
+	Phone          string
+	Email          string
+	Password       string
+	OTP            string
+	OTPExpiry      time.Time
+	ReferralCode   string
+	ReferredUserID uint
+}
 
 // .................................................login page............................................
 func GetLoginPage(ctx *gin.Context) {
@@ -73,269 +82,270 @@ func GetSignUpPage(c *gin.Context) {
 
 // ...................................................signup................................................................
 func SignUp(c *gin.Context) {
+	name := c.PostForm("name")
+	phone := c.PostForm("phone")
+	email := c.PostForm("email")
+	password := c.PostForm("password")
+	referralCode := c.PostForm("referralCode")
 
-	var user models.User
-
-	Name := c.PostForm("name")
-	Phone := c.PostForm("phone")
-	Email := c.PostForm("email")
-	Password := c.PostForm("password")
-	ReferralCode := c.PostForm("referralCode")
-
-	if ReferralCode != "" {
-
-		err := models.DB.Where("referral_code = ?", ReferralCode).First(&user).Error
-		if err != nil {
-			if err == gorm.ErrRecordNotFound {
-				helpers.SendResponse(c, http.StatusNotFound, "Referral code not found", nil)
-
-			} else {
-				helpers.SendResponse(c, http.StatusInternalServerError, "Internal server error", nil)
-
-			}
-			return
-		}
-
-		TempStore["referredUserID"] = strconv.Itoa(int(user.ID))
-
-	}
-	if !utils.EmailValidation(Email) || !utils.ValidPhoneNumber(Phone) || !utils.CheckPasswordComplexity(Password) {
-		if !utils.EmailValidation(Email) {
-			helpers.SendResponse(c, http.StatusBadRequest, "Invalid email", nil)
-
-		}
-
-		if !utils.ValidPhoneNumber(Phone) {
-			helpers.SendResponse(c, http.StatusBadRequest, "Invalid phone number", nil)
-
-		}
-		if !utils.CheckPasswordComplexity(Password) {
-			helpers.SendResponse(c, http.StatusBadRequest, "Password must be at least 4 characters long", nil)
-
-		}
-	} else {
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(Password), bcrypt.DefaultCost)
-		if err != nil {
-			helpers.SendResponse(c, http.StatusInternalServerError, "Internal server error", nil)
-
-			return
-		}
-
-		HPassword := string(hashedPassword)
-		Otp := utils.GenerateOTP()
-		OtpExpiry := time.Now().Add(1 * time.Minute)
-		log.Printf("gererated OTP: %v", Otp)
-
-		TempStore["name"] = Name
-		TempStore["phone"] = Phone
-		TempStore["email"] = Email
-		TempStore["password"] = HPassword
-		TempStore2["time"] = OtpExpiry
-		TempStore["otp"] = Otp
-
-		if err := models.EmailExists(models.DB, Email, &user); err == nil {
-			helpers.SendResponse(c, http.StatusBadRequest, "Email already exists", nil)
-			return
-		}
-
-		if err := services.SendVerificationEmail(Email, Otp); err != nil {
-			helpers.SendResponse(c, http.StatusInternalServerError, "Failed to send OTP", nil)
-
-		}
-		helpers.SendResponse(c, http.StatusOK, "OTP sent successfully", nil)
-
+	// Validate input
+	if err := validateInput(name, phone, email, password); err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid input", nil)
+		return
 	}
 
+	// Check if email already exists
+	if err := models.EmailExists(models.DB, email, nil); err == nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "Email already exists", nil)
+		return
+	}
+
+	// Handle referral code
+	refUserID, err := handleReferralCode(referralCode)
+	if err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "Referral ID not found", nil)
+		return
+	}
+
+	// Generate hashed password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "Failed to process password", nil)
+		return
+	}
+
+	// Generate OTP
+	otp := utils.GenerateOTP()
+	log.Printf("%v", otp)
+
+	// Create session
+	session := Session{
+		Name:           name,
+		Phone:          phone,
+		Email:          email,
+		Password:       string(hashedPassword),
+		OTP:            otp,
+		OTPExpiry:      time.Now().Add(1 * time.Minute),
+		ReferralCode:   referralCode,
+		ReferredUserID: refUserID,
+	}
+
+	// Store session
+	if err := storeSession(c, session); err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "Failed to create session", nil)
+		return
+	}
+
+	// Send OTP
+	if err := services.SendVerificationEmail(email, otp); err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "Failed to send OTP", nil)
+		return
+	}
+
+	helpers.SendResponse(c, http.StatusOK, "OTP sent successfully", nil)
 }
-
+//..................................................................................................................
 func GetOTPVerificationPage(c *gin.Context) {
-	helpers.SendResponse(c, http.StatusOK, "Render Otp page", nil)
-
+	helpers.SendResponse(c, http.StatusOK, "Render OTP page", nil)
 }
 
+//.................................................................................................
 func VerifyOTP(c *gin.Context) {
-	EmailOTP := c.PostForm("otp")
-	var input models.User
-	var user models.User
+	session, err := getSession(c)
+	if err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid session", nil)
+		return
+	}
 
-	input.Name = TempStore["name"]
-	input.Phone = TempStore["phone"]
-	input.Email = TempStore["email"]
-	input.Password = TempStore["password"]
-	Otp := TempStore["otp"]
-	// otp time checking
-	if EmailOTP != Otp || time.Now().After(TempStore2["time"]) {
+	// Verify OTP
+	inputOTP := c.PostForm("otp")
+	if inputOTP != session.OTP || time.Now().After(session.OTPExpiry) {
 		helpers.SendResponse(c, http.StatusBadRequest, "Invalid OTP or OTP has expired", nil)
-
-		return
-	}
-	//................................................................// global variable save to refid
-	refidstr := (TempStore["referredUserID"])
-
-	refid, _ := strconv.Atoi(refidstr)
-	//''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-	refrelId := utils.GenerateRandomCode()
-	input.ReferralCode = refrelId
-
-	//......................................................................................................
-	if err := models.DB.Create(&input).Error; err != nil {
-		helpers.SendResponse(c, http.StatusInternalServerError, "Not Create User", nil)
-
 		return
 	}
 
-	input.IsActive = true
-
-	if err := models.DB.Save(&input).Error; err != nil {
-		helpers.SendResponse(c, http.StatusInternalServerError, "Not Save User", nil)
-		return
+	numberStr := strconv.FormatUint(uint64(session.ReferredUserID), 10)
+	// Create new user
+	user := models.User{
+		Name:         session.Name,
+		Phone:        session.Phone,
+		Email:        session.Email,
+		Password:     session.Password,
+		ReferralCode: utils.GenerateRandomCode(),
+		ReferredBy:   numberStr,
+		IsActive:     true,
 	}
 
-	fmt.Println(refid)
-
-	if refid > 0 {
-
-		input.ReferredBy = user.Name
-
-		walletAmount := 100
-
-		var wallet models.Wallet
-		err := models.DB.Where("user_id = ?", refid).First(&wallet).Error
-
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				// Wallet doesn't exist, create a new one
-				newWallet := models.Wallet{
-					UserID:  user.ID,
-					Balance: float64(walletAmount),
-				}
-				if err := models.DB.Create(&newWallet).Error; err != nil {
-					helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create wallet", nil)
-					return
-				}
-				helpers.SendResponse(c, http.StatusOK, "Wallet created successfully", nil)
-
-			}
-			helpers.SendResponse(c, http.StatusInternalServerError, "Error looking up wallet", nil)
-
-			return
-		}
-
-		// Wallet exists, update the balance
-		err = models.DB.Model(&wallet).Update("balance", gorm.Expr("balance + ?", walletAmount)).Error
-		if err != nil {
-			helpers.SendResponse(c, http.StatusInternalServerError, "Error updating wallet balance", nil)
-			return
+	if err := models.DB.Create(&user).Error; err != nil {
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create user", nil)
+		return
+	}
+//.................................................................................................................
+	UserID, err := strconv.ParseUint(user.ReferredBy, 10, 64)
+	if err != nil {
+		helpers.SendResponse(c, http.StatusInternalServerError, "UserId not created for referral bonus  ", nil)
+	}
+	// Handle referral bonus
+	if UserID > 0 {
+		if err := addReferralBonus(uint(UserID)); err != nil {
+			log.Printf("Failed to add referral bonus: %v", err)
 		}
 	}
-	wallet_amount := 0.00
-	newWallet := models.Wallet{
 
-		UserID:  input.ID,
-		Balance: wallet_amount}
-
-	if err := models.DB.Create(&newWallet).Error; err != nil {
-		log.Println(err)
-
+	// Create wallet for new user
+	wallet := models.Wallet{
+		UserID:  user.ID,
+		Balance: 0,
 	}
 
-	helpers.SendResponse(c, http.StatusOK, " Otp verified User Created Successfully", nil)
+	if err := models.DB.Create(&wallet).Error; err != nil {
+		log.Printf("Failed to create wallet: %v", err)
+	}
 
+	helpers.SendResponse(c, http.StatusOK, "OTP verified. User created successfully", nil)
 }
 
-// ...............................................................Resend otp......................................................
+//...........................................................................................................................
+func addReferralBonus(userID uint) error {
+	walletAmount := 100.0
+
+	var wallet models.Wallet
+	err := models.DB.Where("user_id = ?", userID).First(&wallet).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Wallet doesn't exist, create a new one
+			newWallet := models.Wallet{
+				UserID:  userID,
+				Balance: walletAmount,
+			}
+			return models.DB.Create(&newWallet).Error
+		}
+		return err
+	}
+
+	// Wallet exists, update the balance
+	return models.DB.Model(&wallet).Update("balance", gorm.Expr("balance + ?", walletAmount)).Error
+}
+
+//............................................................................................................
 func ResendOTP(c *gin.Context) {
+	session, err := getSession(c)
+	if err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid session", nil)
+		return
+	}
 
-	email := TempStore["email"]
+	email := session.Email
 
-	Otp := utils.GenerateOTP()
-	TempStore["otp"] = Otp
+	// Generate new OTP
+	newOTP := utils.GenerateOTP()
 
-	log.Printf(" %v", email)
-	log.Printf(" %v", Otp)
+	// Update session with new OTP and expiry time
+	session.OTP = newOTP
+	session.OTPExpiry = time.Now().Add(1 * time.Minute)
 
-	if err := services.SendVerificationEmail(email, Otp); err != nil {
+	// Store updated session
+	if err := storeSession(c, *session); err != nil {
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to update session", nil)
+		return
+	}
+
+	log.Printf("Resending OTP to email: %v", email)
+	log.Printf("New OTP: %v", newOTP)
+
+	if err := services.SendVerificationEmail(email, newOTP); err != nil {
 		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to send OTP", nil)
 		return
 	}
-	helpers.SendResponse(c, http.StatusOK, "OTP sent successfully", nil)
-	OtpExpiry := time.Now().Add(1 * time.Minute)
-	TempStore2["time"] = OtpExpiry
 
+	helpers.SendResponse(c, http.StatusOK, "OTP resent successfully", nil)
 }
 
-// .............................................................forgot password page..........................................
-func GetForgotPasswordPage(c *gin.Context) {
 
+//...................................................................................................................
+func GetForgotPasswordPage(c *gin.Context) {
 	helpers.SendResponse(c, http.StatusOK, "Forgot Password Page", nil)
 }
 
-// ..................................................................forgot password............................................................
+//.........................................................................................................
 func InitiatePasswordReset(c *gin.Context) {
+	email := c.PostForm("email")
 
-	var input models.User
-
-	TempStore["email"] = c.PostForm("email")
-	input.Email = TempStore["email"]
-	log.Printf(" %v", input.Email)
-	if err := models.DB.Where("Email = ?", input.Email).First(&input).Error; err != nil {
-		helpers.SendResponse(c, http.StatusNotFound, "User not found", nil)
+	var user models.User
+	if err := models.DB.Where("email = ?", email).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			helpers.SendResponse(c, http.StatusNotFound, "User not found", nil)
+		} else {
+			helpers.SendResponse(c, http.StatusInternalServerError, "Database error", nil)
+		}
 		return
-
 	}
-	Otp := utils.GenerateOTP()
-	OtpExpiry := time.Now().Add(60 * time.Minute)
-	TempStore2["time"] = OtpExpiry
-	TempStore["otp"] = Otp
 
-	log.Printf("hhh %v", Otp)
+	otp := utils.GenerateOTP()
+	otpExpiry := time.Now().Add(1 * time.Minute)
 
-	if err := services.SendVerificationEmail(input.Email, Otp); err != nil {
+	// Create a password reset session
+	resetSession := Session{
+		Email:     email,
+		OTP:       otp,
+		OTPExpiry: otpExpiry,
+	}
+
+	// Store the reset session
+	if err := storeSession(c, resetSession); err != nil {
+		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create reset session", nil)
+		return
+	}
+
+	log.Printf("Sending password reset OTP to email: %v", email)
+	log.Printf("OTP: %v", otp)
+
+	if err := services.SendVerificationEmail(email, otp); err != nil {
 		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to send OTP", nil)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"Status":      "Success",
-		"Status code": "200",
-		"message":     "OTP sent successfully"})
 
-	// c.Redirect(http.StatusFound, "/verify-otp")
-
+	helpers.SendResponse(c, http.StatusOK, "OTP sent successfully", nil)
 }
-
-// ....................................................................reset passwor page..........................................
+//.........................................................................................................................
 func GetResetPasswordPage(c *gin.Context) {
 	helpers.SendResponse(c, http.StatusOK, "Reset Password Page, enter E-mail", nil)
 }
-
-// ..................................................................reset password..................................................
+//..........................................................................................................................
 func ResetPassword(c *gin.Context) {
+	session, err := getSession(c)
+	if err != nil {
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid session", nil)
+		return
+	}
 
 	var input models.User
 	var user models.User
 
-	input.Email = TempStore["email"]
-	password := c.PostForm("password")
-	conform_password := c.PostForm("conf_password")
+	// Verify OTP
+	inputOTP := c.PostForm("otp")
+	if inputOTP != session.OTP || time.Now().After(session.OTPExpiry) {
+		helpers.SendResponse(c, http.StatusBadRequest, "Invalid OTP or OTP has expired", nil)
+		return
+	}
 
-	log.Printf("%v", password)
-	log.Printf("%v", conform_password)
+	input.Email = session.Email
+	password := c.PostForm("password")
+	confirmPassword := c.PostForm("conf_password")
 
 	if !utils.CheckPasswordComplexity(password) {
 		helpers.SendResponse(c, http.StatusBadRequest, "Password is not strong enough", nil)
-
 		return
 	}
 
-	if password != conform_password {
+	if password != confirmPassword {
 		helpers.SendResponse(c, http.StatusBadRequest, "Password and Confirm Password do not match", nil)
-
 		return
 	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		helpers.SendResponse(c, http.StatusInternalServerError, "Password not hashed", nil)
-
 		return
 	}
 
@@ -345,15 +355,90 @@ func ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// Clear the email from temporary storage
-	delete(TempStore, "email")
 	helpers.SendResponse(c, http.StatusOK, "Password reset successfully", nil)
-
 }
 
-// .............................................................logout.....................................................
 func Logout(c *gin.Context) {
+	c.SetCookie("token", "", -1, "/", "", false, true)
+	helpers.SendResponse(c, http.StatusOK, "Logged out successfully", nil)
+}
 
-	c.SetCookie("token", "", -1, "/", "localhost", false, true)
-	helpers.SendResponse(c, http.StatusOK, "Logout Successfully", nil)
+// .......................................................................................................
+func storeSession(c *gin.Context, session Session) error {
+	// Generate a new session ID
+	//	sessionID := uuid.New().String()
+
+	// Marshal the session data to JSON
+	sessionData, err := json.Marshal(session)
+	if err != nil {
+		log.Printf("Failed to marshal session: %v", err)
+		return fmt.Errorf("failed to marshal session: %w", err)
+	}
+
+	encryptedSessionData, err := utils.Encrypt(sessionData)
+	if err != nil {
+		log.Printf("Failed to encrypt session data: %v", err)
+		return fmt.Errorf("failed to encrypt session data: %w", err)
+	}
+
+	secureCookie := gin.Mode() != gin.DebugMode
+
+	//c.SetCookie("session_id", sessionID, int(30*time.Minute.Seconds()), "/", "", secureCookie, true)
+	c.SetCookie("session_data", string(encryptedSessionData), int(30*time.Minute.Seconds()), "/", "", secureCookie, true)
+
+	return nil
+}
+func getSession(c *gin.Context) (*Session, error) {
+
+	sessionData, err := c.Cookie("session_data")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session data cookie: %w", err)
+	}
+
+	// Decrypt session data (assuming sessionData is a base64 string)
+	decryptedSessionData, err := utils.Decrypt(sessionData) // Pass directly as string
+	if err != nil {
+		log.Printf("Failed to decrypt session data: %v", err)
+		return nil, fmt.Errorf("failed to decrypt session data: %w", err)
+	}
+
+	var session Session
+	if err := json.Unmarshal(decryptedSessionData, &session); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal session: %w", err)
+	}
+
+	return &session, nil
+}
+
+func validateInput(name, phone, email, password string) error {
+	if name == "" || phone == "" || email == "" || password == "" {
+		return fmt.Errorf("all fields are required")
+	}
+	if !utils.EmailValidation(email) {
+		return fmt.Errorf("invalid email")
+	}
+	if !utils.ValidPhoneNumber(phone) {
+		return fmt.Errorf("invalid phone number")
+	}
+	if !utils.CheckPasswordComplexity(password) {
+		return fmt.Errorf("password must be at least 4 characters long")
+	}
+	return nil
+}
+
+func handleReferralCode(referralCode string) (uint, error) {
+	if referralCode == "" {
+		return 0, nil // No referral code provided, which is okay
+	}
+
+	var referrer models.User
+	err := models.DB.Where("referral_code = ?", referralCode).First(&referrer).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return 0, fmt.Errorf("invalid referral code")
+		}
+		return 0, fmt.Errorf("error processing referral code: %v", err)
+	}
+
+	return referrer.ID, nil
 }
