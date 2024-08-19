@@ -7,6 +7,7 @@ import (
 	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -1027,7 +1028,10 @@ func Invoice(c *gin.Context) {
 	pdf.CellFormat(150, 10, "Grand Total:", "", 0, "R", false, 0, "")
 	pdf.Cell(40, 10, fmt.Sprintf("%.2f", order.FinalAmount))
 
-	pdfPath := filepath.Join("C:/Users/Sherinas/Downloads", "sales_report_"+time.Now().Format("20060102150405")+".pdf")
+	// pdfPath := filepath.Join("C:/Users/Sherinas/Downloads", "sales_report_"+time.Now().Format("20060102150405")+".pdf")
+	tempDir := os.TempDir()
+	pdfPath := filepath.Join(tempDir, "invoice_"+time.Now().Format("20060102150405")+".pdf")
+
 	if err := pdf.OutputFileAndClose(pdfPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate PDF file: " + err.Error()})
 		return

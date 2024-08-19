@@ -144,12 +144,13 @@ func SignUp(c *gin.Context) {
 
 	helpers.SendResponse(c, http.StatusOK, "OTP sent successfully", nil)
 }
-//..................................................................................................................
+
+// ..................................................................................................................
 func GetOTPVerificationPage(c *gin.Context) {
 	helpers.SendResponse(c, http.StatusOK, "Render OTP page", nil)
 }
 
-//.................................................................................................
+// .................................................................................................
 func VerifyOTP(c *gin.Context) {
 	session, err := getSession(c)
 	if err != nil {
@@ -180,7 +181,7 @@ func VerifyOTP(c *gin.Context) {
 		helpers.SendResponse(c, http.StatusInternalServerError, "Failed to create user", nil)
 		return
 	}
-//.................................................................................................................
+	//.................................................................................................................
 	UserID, err := strconv.ParseUint(user.ReferredBy, 10, 64)
 	if err != nil {
 		helpers.SendResponse(c, http.StatusInternalServerError, "UserId not created for referral bonus  ", nil)
@@ -205,7 +206,7 @@ func VerifyOTP(c *gin.Context) {
 	helpers.SendResponse(c, http.StatusOK, "OTP verified. User created successfully", nil)
 }
 
-//...........................................................................................................................
+// ...........................................................................................................................
 func addReferralBonus(userID uint) error {
 	walletAmount := 100.0
 
@@ -227,7 +228,7 @@ func addReferralBonus(userID uint) error {
 	return models.DB.Model(&wallet).Update("balance", gorm.Expr("balance + ?", walletAmount)).Error
 }
 
-//............................................................................................................
+// ............................................................................................................
 func ResendOTP(c *gin.Context) {
 	session, err := getSession(c)
 	if err != nil {
@@ -261,13 +262,12 @@ func ResendOTP(c *gin.Context) {
 	helpers.SendResponse(c, http.StatusOK, "OTP resent successfully", nil)
 }
 
-
-//...................................................................................................................
+// ...................................................................................................................
 func GetForgotPasswordPage(c *gin.Context) {
 	helpers.SendResponse(c, http.StatusOK, "Forgot Password Page", nil)
 }
 
-//.........................................................................................................
+// .........................................................................................................
 func InitiatePasswordReset(c *gin.Context) {
 	email := c.PostForm("email")
 
@@ -307,11 +307,13 @@ func InitiatePasswordReset(c *gin.Context) {
 
 	helpers.SendResponse(c, http.StatusOK, "OTP sent successfully", nil)
 }
-//.........................................................................................................................
+
+// .........................................................................................................................
 func GetResetPasswordPage(c *gin.Context) {
 	helpers.SendResponse(c, http.StatusOK, "Reset Password Page, enter E-mail", nil)
 }
-//..........................................................................................................................
+
+// ..........................................................................................................................
 func ResetPassword(c *gin.Context) {
 	session, err := getSession(c)
 	if err != nil {

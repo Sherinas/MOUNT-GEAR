@@ -5,6 +5,7 @@ import (
 	"mountgear/helpers"
 	"mountgear/models"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -148,7 +149,9 @@ func SalesReport(c *gin.Context) {
 // ......................................................................gerarate pdf...............................
 func generatePDF(report []SalesReportItem) (string, error) {
 
-	pdfPath := filepath.Join("C:/Users/Sherinas/Downloads/", "sales_report_"+time.Now().Format("20060102150405")+".pdf")
+	// pdfPath := filepath.Join("C:/Users/Sherinas/Downloads/", "sales_report_"+time.Now().Format("20060102150405")+".pdf")
+	tempDir := os.TempDir()
+	pdfPath := filepath.Join(tempDir, "sales_report_"+time.Now().Format("20060102150405")+".pdf")
 
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
@@ -198,7 +201,10 @@ func generatePDF(report []SalesReportItem) (string, error) {
 
 // ...........................................grnarate Excel.......................................................................
 func generateExcel(report []SalesReportItem) (string, error) {
-	excelPath := filepath.Join("C:/Users/Sherinas/Downloads/", "sales_report_"+time.Now().Format("20060102150405")+".xlsx")
+
+	// excelPath := filepath.Join("C:/Users/Sherinas/Downloads/", "sales_report_"+time.Now().Format("20060102150405")+".xlsx")
+	tempDir := os.TempDir()
+	excelPath := filepath.Join(tempDir, "sales_report_"+time.Now().Format("20060102150405")+".xlsx")
 
 	f := excelize.NewFile()
 	sheet := "Sheet1"
