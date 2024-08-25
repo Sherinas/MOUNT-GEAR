@@ -35,4 +35,4 @@ MountGear is an e-commerce website developed for selling cycles online, using Go
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/mountgear.git
+https://github.com/Sherinas/MOUNT-GEAR.git
